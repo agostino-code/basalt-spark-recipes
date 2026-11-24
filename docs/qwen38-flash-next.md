@@ -102,8 +102,9 @@ model's own PPL. The gate took 583 s (5.8 s per chunk).
 
 ## Install
 
-One script builds the lane with the versions this recipe was measured with — port commit `8172978`, CUDA 13,
-`CMAKE_CUDA_ARCHITECTURES=121`, the `Qwen3.8-FN-NVFP4-DQ6_K` pack (122.6 GiB):
+One script builds the lane with the versions this recipe pins — port commit `f9bf55aa`, one commit
+past the `8172978` these numbers were measured on (it changes Hy4 kernels only, Qwen untouched);
+CUDA 13, `CMAKE_CUDA_ARCHITECTURES=121`, the `Qwen3.8-FN-NVFP4-DQ6_K` pack (122.6 GiB):
 
 ```bash
 git clone https://github.com/agostino-code/basalt-spark-recipes
@@ -118,9 +119,9 @@ What it does, in order — every step is idempotent:
 | Step | What happens | Time |
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 130 GiB free | seconds |
-| 2 | clones `andreasknopke/basalt-arm-sm121` at **`8172978`**, the commit we validated | ~1 min |
+| 2 | clones `andreasknopke/basalt-arm-sm121` at **`f9bf55aa`**, the commit we validated | ~1 min |
 | 3 | applies `patches/0001-spark-sm121-fixes.patch` when the tree does not already carry it | seconds |
-| 4 | builds it, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
+| 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Qwen3.8-Flash-Next-Basalt](https://huggingface.co/jesdga/Qwen3.8-Flash-Next-Basalt), resumable, size- and sha256-checked | 1–3 h |
 | 7 | writes `start-qwen.sh`, optionally the systemd user unit, starts the lane once and smoke-tests it | ~2 min |

@@ -15,7 +15,7 @@ time.
 `qwen38-flash-next-on-spark`. Their full measured records are kept as the two per-model appendices —
 [docs/hy4-flash.md](docs/hy4-flash.md) and [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) —
 with paths and cross-repo links updated, and the Hy4 appendix's stale port pin (`df6a10cf`) corrected
-to the `8172978` this unified installer builds. This README is the shared install and the unified view.
+to the `f9bf55aa` this unified installer builds. This README is the shared install and the unified view.
 
 What is ours is small: the fork, the one patch, the lane configuration and the measurements. The
 engine, the port, the packs and the models are other people's work — see [Credits](#credits). The
@@ -39,8 +39,10 @@ not tested*; both appendices are that validation for their pack.
   * [tools/start-basalt-hy4.py](tools/start-basalt-hy4.py) and [tools/start-basalt-hy4.sh](tools/start-basalt-hy4.sh) — the supervisor wrapper for the Hy4 lane; they carry our Spark's absolute paths.
   * [tools/concurrency.py](tools/concurrency.py) — the concurrency ladder used for the Qwen four-window numbers.
   * [tools/qwen-lane-check.py](tools/qwen-lane-check.py) — the Qwen acceptance check (R1/R2/R3, then a fault scan of the log).
-* [evidence/](evidence/) — the raw logs of the Qwen lane: `lane.log`, `smoke.log`, `basalt-bench.log`,
-  `quality.log`, `bench-random-body.log`, `lane-quiet.log`.
+* [evidence/](evidence/) — the raw logs: the Qwen lane (`lane.log`, `smoke.log`, `basalt-bench.log`,
+  `quality.log`, `bench-random-body.log`, `lane-quiet.log`), and the Hy4 lane after the Engram fix
+  (`hy4-quality-f9bf55aa.log`, `hy4-smoke-f9bf55aa.log`), plus the one RAM-tier fault seen before
+  dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
@@ -84,9 +86,9 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 | Step | What happens | Time |
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, free disk (160 GiB for the Hy4 pack, 130 GiB for Qwen) | seconds |
-| 2 | engine tree: clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`8172978ddc04beaaae15e70c77f6cc075833d784`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
+| 2 | engine tree: clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aab0b507e2130db34c2463b209c319d8e2`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
 | 3 | applies `patches/0001-spark-sm121-fixes.patch` when the tree does not already carry it — the pinned fork commit does | seconds |
-| 4 | builds it when `bin/basalt` is missing, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
+| 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `basalt-port/.venv` and installs the pinned `requirements.txt` when the venv is missing | ~1 min |
 | 6 | downloads each selected pack into `basalt-port/models/` when it is missing or incomplete, resumable and size-checked | 1–3 h per pack |
 | 7 | writes `basalt-port/start-hy4.sh` / `start-qwen.sh`, and with `--install-unit` the systemd user unit(s) | seconds |
@@ -135,8 +137,9 @@ the ports are shared with other lanes on our box, so an automatic start would ra
 ## What we measured
 
 Both lanes were measured on the same box: DGX Spark, GB10, 121 GiB of unified memory, Ubuntu 24.04,
-CUDA 13.0.88, Basalt 0.5.0. The full per-depth tables, the conditions and the raw logs are in the
-appendices; this is the condensed record, with the measured figures kept exact.
+CUDA 13.0.88, Basalt 0.5.0 plus the pinned fork's sm_121 fixes and (for the Hy4 quality gate) #556.
+The full per-depth tables, the conditions and the raw logs are in the appendices; this is the
+condensed record, with the measured figures kept exact.
 
 ### Hy4-Flash
 
@@ -146,7 +149,8 @@ appendices; this is the condensed record, with the measured figures kept exact.
 | Decode | **20–23 tok/s**, essentially independent of context: 20.3 at 165k, 20.0 at 220k, 24.9 at 250k and 262k with one active slot |
 | Context per request | **262,144 tokens, prompt + answer together**; 165,022, 220,022, 249,997 and 261,987 tokens pass, 264,022 is refused, so the window itself is the limit |
 | Slots / KV | four slots × 262,144 = 1,048,576 cells; KV ≈ 15 GiB, experts resident in VRAM (`ram-experts=0.0GB`) |
-| Benchmarks | opencode-bench-plusplus, suite `locker-v5`, variant `default`: quality **0.9881**, wall **42:36**, 102 steps, peak request 104,014 tokens. codec-reverse-bench, variant `high`: **57.0** points, roundtrip solved in stage 3 (35 of 57), 11/15 structure questions, compression ratio 61.2 |
+| Quality vs BF16 | **PPL 17.5207 ± 0.4442** (base 18.4162), **KLD mean 0.20300**, **same top-1 86.32 %** — 100 chunks, 25,500 rows, T=1, after the Engram epsilon fix (#556). The pre-fix engine reads 0.782 KLD / 76.77 % on the same base |
+| Benchmarks | opencode-bench-plusplus, suite `locker-v5`, variant `default`: quality **0.9881**, wall **42:36**, 102 steps, peak request 104,014 tokens — measured on `8172978`, before #556. codec-reverse-bench, variant `high`: **57.0** points, roundtrip solved in stage 3 (35 of 57), 11/15 structure questions, compression ratio 61.2 |
 | Stability | **0 engine faults** across both benchmark runs (≈500 requests, peak request 128k tokens) |
 
 Full tables: [docs/hy4-flash.md#what-we-measured](docs/hy4-flash.md#what-we-measured). The two
@@ -174,10 +178,14 @@ The Infernix comparison, same model and same box, is in
 ## The shared engine
 
 Both lanes run the fork [`andreasknopke/basalt-arm-sm121`](https://github.com/andreasknopke/basalt-arm-sm121),
-branch `hy4-port`, pinned in the installer at `8172978ddc04beaaae15e70c77f6cc075833d784`. The fork
+branch `hy4-port`, pinned in the installer at `f9bf55aab0b507e2130db34c2463b209c319d8e2`. The fork
 merges upstream Basalt **v0.5.0** into yanmindi's Arm64/sm_121 port — that merge is where the
 Hy4-flash support enters the port — carries the MMQ read-past fix for the dense tensors, and adds the
-two sm_121 prompt-fault fixes. One tree, one commit, one `bin/basalt` for both models.
+two sm_121 prompt-fault fixes. One commit past `8172978`, the tree the Qwen numbers were measured on,
+it also carries upstream **#556**, the Hy4 Engram epsilon fix: the gate norms the stream and the key
+with FP32's machine epsilon as the reference does, where bf16's 0.0078 swamped small keys and put
+stray byte tokens after a `},` line split. That commit touches Hy4 kernels only; Qwen is untouched.
+One tree, one commit, one `bin/basalt` for both models.
 
 The one patch, [patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch):
 

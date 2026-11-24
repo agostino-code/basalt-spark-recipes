@@ -19,7 +19,8 @@
 #   2. clones andreasknopke/basalt-arm-sm121 at the pinned commit we validated, or reuses --dir
 #   3. applies patches/0001-spark-sm121-fixes.patch (the sm_121 fixes: NVFP4 tiled MMQ path, expert ring
 #      off, product names in MMQ launch errors) only when the tree does not already carry it
-#   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing — about 10 minutes
+#   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing or was last built
+#      at another commit — about 10 minutes
 #   5. creates the server venv and installs the pinned requirements when .venv is missing
 #   6. downloads each selected model's NVFP4 pack when it is missing or incomplete (147.8 GiB Hy4,
 #      122.6 GiB Qwen, resumable and size-checked)
@@ -54,10 +55,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # One engine tree for both lanes: our fork (andreasknopke's Arm64/sm_121 port, with the upstream v0.5.0
 # merge that brings the Hy4-flash and Qwen3.8-Flash-Next support, the MMQ read-past fix and the two
 # sm_121 prompt-fault fixes). Same commit for both lanes — the Qwen recipe adds no engine change, only
-# a pack and a start script. This commit is byte-identical to the tree the README numbers were
-# measured on.
+# a pack and a start script. One commit past 8172978, the tree the Qwen numbers were measured on: it
+# carries upstream #556, the Hy4 Engram epsilon fix (Hy4 kernels only, Qwen untouched).
 PORT_REPO="https://github.com/andreasknopke/basalt-arm-sm121.git"
-PORT_COMMIT="8172978ddc04beaaae15e70c77f6cc075833d784"   # branch hy4-port, 2026-11-22
+PORT_COMMIT="f9bf55aab0b507e2130db34c2463b209c319d8e2"   # branch hy4-port, 2026-11-22
 # The two old repositories carried byte-identical copies of this patch; this one file replaces them.
 PATCH="$SCRIPT_DIR/patches/0001-spark-sm121-fixes.patch"
 
@@ -280,6 +281,7 @@ else
     git clone --quiet "$PORT_REPO" "$TARGET"
     git -C "$TARGET" checkout --quiet "$PORT_COMMIT" || die "cannot check out ${PORT_COMMIT:0:8} in $TARGET"
 fi
+HEAD_SHA="$(git -C "$TARGET" rev-parse HEAD)"
 echo "  at $(git -C "$TARGET" rev-parse --short HEAD) — $(git -C "$TARGET" log -1 --format=%s | cut -c1-60)"
 
 # --- 3. the sm_121 patch ---------------------------------------------------------
@@ -300,15 +302,28 @@ fi
 
 # --- 4. build --------------------------------------------------------------------
 say 4/8 "building (Release, sm_121) — about 10 minutes"
-if [ -x "$TARGET/bin/basalt" ]; then
-    echo "  already built: $TARGET/bin/basalt ($(du -h "$TARGET/bin/basalt" | cut -f1))"
+# The binary must belong to the checked-out commit: a pin bump (or a tree moved by hand) rebuilds, so a
+# reused install never runs yesterday's engine. The stamp is written only after a successful build.
+BUILT_AT="$TARGET/build/.port-commit"
+BUILT=""
+[ -f "$BUILT_AT" ] && BUILT="$(cat "$BUILT_AT" 2>/dev/null || true)"
+if [ -x "$TARGET/bin/basalt" ] && [ "$BUILT" = "$HEAD_SHA" ]; then
+    echo "  already built at ${HEAD_SHA:0:8}: $TARGET/bin/basalt ($(du -h "$TARGET/bin/basalt" | cut -f1))"
 else
     export PATH="/usr/local/cuda/bin:${PATH}"
     export CUDACXX="${NVCC}"
+    # A build/ copied or moved with the tree still names the old source path in CMakeCache.txt, and
+    # cmake refuses to configure it. The folder is generated output: drop it and configure fresh.
+    CACHE_SRC="$(sed -n 's/^CMAKE_HOME_DIRECTORY:INTERNAL=//p' "$TARGET/build/CMakeCache.txt" 2>/dev/null | head -1)"
+    if [ -n "$CACHE_SRC" ] && [ "$CACHE_SRC" != "$TARGET" ]; then
+        echo "  build cache was configured for $CACHE_SRC — removing the stale build/ and configuring fresh"
+        rm -rf "${TARGET:?}/build"
+    fi
     cmake -S "$TARGET" -B "$TARGET/build" -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121 >/dev/null
     cmake --build "$TARGET/build" -j "$JOBS"
     [ -x "$TARGET/bin/basalt" ] || die "build finished without bin/basalt"
-    echo "  $(du -h "$TARGET/bin/basalt" | cut -f1) binary at $TARGET/bin/basalt"
+    printf '%s\n' "$HEAD_SHA" > "$BUILT_AT"
+    echo "  $(du -h "$TARGET/bin/basalt" | cut -f1) binary at $TARGET/bin/basalt for ${HEAD_SHA:0:8}"
 fi
 
 # --- 5. server venv --------------------------------------------------------------

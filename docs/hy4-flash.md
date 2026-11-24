@@ -17,9 +17,10 @@ fixed them far enough to run agent workloads for hours, and wrote the numbers do
 **What is ours** is the fork [`andreasknopke/basalt-arm-sm121`](https://github.com/andreasknopke/basalt-arm-sm121)
 (branch `hy4-port`, pinned in the installer): it merges the upstream **v0.5.0** into yanmindi's
 Arm64/sm_121 port — that merge is where the Hy4-flash support enters the port — adds the MMQ
-read-past fix for the dense tensors, and the two sm_121 prompt-fault fixes, plus the crash
+read-past fix for the dense tensors, the two sm_121 prompt-fault fixes, and (one commit past the tree
+the Qwen numbers were measured on) upstream **#556**, the Engram epsilon fix, plus the crash
 reproduction, the lane configuration and the measurements below. The engine, the port and the
-model underneath stay other people's work — see [Credits](#credits). The fixes are **workarounds, not root causes**: we know which code path
+model underneath stay other people's work — see [Credits](#credits). The sm_121 fixes are **workarounds, not root causes**: we know which code path
 faults and that the other one does not, not which instruction does it (see
 [Open questions](#open-questions)).
 
@@ -39,7 +40,8 @@ Benchmark results, both on the public leaderboards:
 
 * **opencode-bench-plusplus, suite `locker-v5`, variant `default`** — quality **0.9881**, wall
   **42:36**, 102 steps, model time 2500 s, peak request 104 014 tokens, eligible, gate pass →
-  [issue #34](https://github.com/knopkem/opencode-bench-plusplus/issues/34)
+  [issue #34](https://github.com/knopkem/opencode-bench-plusplus/issues/34) (measured on `8172978`,
+  before #556)
 * **codec-reverse-bench, variant `high`** — **57.0** points, roundtrip solved in **stage 3**
   (35 of 57 points), 11/15 structure questions right, compression ratio 61.2 →
   [issue #13](https://github.com/andreasknopke/codec-reverse-bench-leaderboard/issues/13)
@@ -47,12 +49,37 @@ Benchmark results, both on the public leaderboards:
 For reference: on the codec leaderboard the cap without a verified roundtrip is 25, the top of the
 board is around 127, strong local lanes around 85 — 57 is a real codec, mid-field, about on par with Qwen3.8-Flash-Next NVFP4
 
+### Quality against the BF16 reference
+
+The Engram gate normed the stream and the key with bf16's machine epsilon (`0.0078125`) where the
+model uses FP32's. That epsilon swamps small keys: after a line end sampled as `},` `\n` ` ` instead
+of `},\n` ` `, the next row put 77–94 % of its mass on `...\n`, with byte tokens, `\x7f` and U+FEFF
+behind it. Upstream **#556**, which the pinned commit carries, uses FP32's epsilon; the same prefix
+then gives ` {"` at p 1.000. The stray JSON/code answers in #556's harness went from 3–4 of 48 to
+0 of 48.
+
+The gate (`basalt-bench --quality 100 --kld-base hy4flash-bf16-base.kld --quality-t 1`: 100 chunks,
+25,500 rows, T=1) on this box against the rebuilt BF16 base (base PPL 18.4162, sha256
+`8502b5d2…` from [basalt-kld-bases](https://huggingface.co/datasets/jesdga/basalt-kld-bases)):
+
+| | This lane, GB10 (`f9bf55aa`) | Upstream 0.5.6, RTX 5090 | Pre-#556 engine |
+|---|---:|---:|---:|
+| PPL | 17.5207 ± 0.4442 | 17.484 | 17.565 |
+| KLD mean | 0.20300 | 0.209 | 0.782 |
+| same top-1 | 86.32 % | 86.14 % | 76.77 % |
+
+The GB10 lane reproduces the fixed engine's quality: KLD and top-1 are where 0.5.6 puts them, not
+where the pre-fix engine does. Our run is the engine's auto placement (512 of 512 experts on the
+card); upstream's 5090 number pins `--expert-cache 4800`. The 0.9881 opencode-bench row above is
+**not** a post-fix number — it was measured on `8172978` — and the fix changes Hy4 output, so the
+gate above is the figure to compare across the fix.
+
 ---
 
 ## Install
 
-One script builds the whole lane with the versions this recipe was measured with — port commit
-`8172978`, CUDA 13, `CMAKE_CUDA_ARCHITECTURES=121`, the NVFP4 pack `Hy4-flash-NVFP4` (147.8 GiB):
+One script builds the whole lane with the versions this recipe pins — port commit
+`f9bf55aa`, CUDA 13, `CMAKE_CUDA_ARCHITECTURES=121`, the NVFP4 pack `Hy4-flash-NVFP4` (147.8 GiB):
 
 ```bash
 git clone https://github.com/agostino-code/basalt-spark-recipes
@@ -81,9 +108,9 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 | Step | What happens | Time |
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 160 GiB free for the pack | seconds |
-| 2 | clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`8172978`**, the commit we validated, into `basalt-port/` | ~1 min |
+| 2 | clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aa`**, the commit we validated, into `basalt-port/` | ~1 min |
 | 3 | applies `patches/0001-spark-sm121-fixes.patch` when the tree does not already carry it — the pinned fork commit does: NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors | seconds |
-| 4 | builds it, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
+| 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Hy4-flash-Basalt](https://huggingface.co/jesdga/Hy4-flash-Basalt) into `models/`, resumable and size-checked | 1–3 h |
 | 7 | writes `start-hy4.sh`, optionally the systemd user unit, starts the lane once and smoke-tests it | ~1 min |
@@ -152,10 +179,13 @@ point at a lane on a non-default port.
 `./install-basalt.sh --model hy4` does the following; manually it is:
 
 ```bash
-git clone https://github.com/yanmindi/basalt-arm-sm121 basalt-port
-cd basalt-port && git apply /path/to/patches/0001-spark-sm121-fixes.patch
+git clone https://github.com/andreasknopke/basalt-arm-sm121 basalt-port
+cd basalt-port && git checkout f9bf55aab0b507e2130db34c2463b209c319d8e2
+# the pin already carries the sm_121 patch and #556; the installer applies
+# patches/0001-spark-sm121-fixes.patch only to a tree that does not carry it
 export PATH=/usr/local/cuda/bin:$PATH CUDACXX=/usr/local/cuda/bin/nvcc
-cmake -B build && cmake --build build -j 4          # ~10 min for the full build
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121
+cmake --build build -j 4          # ~10 min for the full build
 ```
 
 ### Lane configuration
@@ -263,7 +293,12 @@ per-layer staging costs nothing measurable here, so this is a workaround with no
   — the kernel compares `cudaMemGetInfo` against `MemFree`, and the page cache of the 148 GiB pack
   eats the machine. No root needed to fix:
   `os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)` on the pack returns ~100 GiB instantly and
-  leaves running downloads untouched.
+  leaves running downloads untouched. The same pressure has a quieter form: in our first lane start
+  after downloading the 6.2 GB KLD base (still cached, the pack dropped), the plan put 26 of 512
+  experts per layer in the host RAM tier; the first request passed and a second slot died with
+  `expert 376 of layer 2 is not in RAM`. Dropping the base's cache too brought the plan back to
+  512 of 512 experts on the card, where three sequential requests ran. The lane's start script drops
+  only the pack, not a base file downloaded for measurement.
 * **compute-sanitizer is not usable at this model size.** `memcheck` needs shadow memory; with an
   86 GiB model resident, the engine aborts loading (`RAM ran out loading (839 MiB free)`) and the
   expert tier shrinks to 11 of 512 experts — which changes the state and hides the bug. Use targeted

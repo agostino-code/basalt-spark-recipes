@@ -1,0 +1,25 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=262144 (1048576/4 slots) batch=4 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30000/v1  openai+anthropic  stats http://127.0.0.1:30000/
+[server] network  http://192.168.1.241:30000/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=4.2GB pool=19
+[server] ram      floor 2.1 GiB of 100.2 GiB free
+[server] loading model weights [==========>             ]  38.7/86.2 GiB  2845 MB/s
+[server] loaded   86.2GiB 35.0s
+[server] slots    par=4 ctx/slot=262144, others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] thinking budget 350 tokens, output cap 700 (answer-room auto)
+[server] live | s1 tg=1/700 | total 0t/s
+[server] live | s1 tg=60/700 29.5t/s | total 29t/s
+[server] live | s1 tg=103/700 24.5t/s | total 24t/s
+[server] live | s1 tg=162/700 25.9t/s | total 26t/s
+[server] s1 done  pp=62/0c 0.9s  tg=191 25.8t/s acc=63% dl=3.3  ttft=1.0s  end=stop  hit=99.0%  pcie=0.0%
+[server] thinking budget 40 tokens, output cap 80 (answer-room auto)
+[server] error: engine reported hy4flash: expert 376 of layer 2 is not in RAM (a pack larger than RAM is not run yet)
+[server] s1 done  pp=31/0c  tg=0  end=error
+[server] stopping (Ctrl+C again to force)
+basalt serve: error: hy4flash: expert 376 of layer 2 is not in RAM (a pack larger than RAM is not run yet)
+[server] stopped

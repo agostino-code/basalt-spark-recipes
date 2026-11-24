@@ -1,0 +1,26 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=262144 (1048576/4 slots) batch=4 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30000/v1  openai+anthropic  stats http://127.0.0.1:30000/
+[server] network  http://192.168.1.241:30000/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=19
+[server] ram      floor 2.0 GiB of 99.8 GiB free
+[server] loading model weights [===========>            ]  40.2/86.2 GiB  2797 MB/s
+[server] loaded   86.2GiB 33.3s
+[server] slots    par=4 ctx/slot=262144, others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] thinking budget 60 tokens, output cap 120 (answer-room auto)
+[server] live | s1 tg=19/120 | total 0t/s
+[server] s1 done  pp=33/0c 0.5s  tg=64 30.1t/s acc=62% dl=2.8  ttft=0.6s  end=stop  hit=100.0%  pcie=0.0%
+[server] thinking budget 60 tokens, output cap 120 (answer-room auto)
+[server] live | s2 tg=18/120 34.7t/s | total 35t/s
+[server] thinking budget reached (60 tokens), wrapping up
+[server] s2 done  pp=33/0c 0.0s  tg=69 35.1t/s acc=100% dl=2.6  ttft=0.6s  end=stop  hit=100.0%  pcie=0.0%
+[server] thinking budget 60 tokens, output cap 120 (answer-room auto)
+[server] live | s3 tg=19/120 | total 0t/s
+[server] thinking budget reached (60 tokens), wrapping up
+[server] s3 done  pp=33/0c 0.1s  tg=69 36.1t/s acc=100% dl=2.7  ttft=0.6s  end=stop  hit=100.0%  pcie=0.0%
+[server] stopping (Ctrl+C again to force)
+[server] stopped
