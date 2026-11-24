@@ -308,9 +308,11 @@ per-layer staging costs nothing measurable here, so this is a workaround with no
 * **More than 262,144 tokens per slot is not stable.** The engine accepts
   `--parallel 2 --max-context 1048576` (2 × 524,288) and a single 1,048,576 slot, and a 16k prompt
   runs; an 80,031-token prompt then died in `prefill mmq: quantize(gemm)` (an illegal memory access)
-  on both, while the same prompt on 4 × 262,144 passed. Tiling the Q8_0 MMQ rows, the sibling of the
-  NVFP4 workaround, did not change it. So the model's 1M context is not reachable through this lane
-  yet: 262,144 per slot is the tested maximum, and the long-window presets were withdrawn.
+  on both, while the same prompt on 4 × 262,144 passed. With `CUDA_LAUNCH_BLOCKING=1` the exact
+  launch is `moe-down` (NVFP4) — the product class of the original sm_121 fault; the unblocked tag
+  is the sticky one. Neither tiling the Q8_0 MMQ rows nor an 8 MiB guard after the staging buffers
+  changed it. So the model's 1M context is not reachable through this lane yet: 262,144 per slot is
+  the tested maximum, and the long-window presets were withdrawn.
 * **compute-sanitizer is not usable at this model size.** `memcheck` needs shadow memory; with an
   86 GiB model resident, the engine aborts loading (`RAM ran out loading (839 MiB free)`) and the
   expert tier shrinks to 11 of 512 experts — which changes the state and hides the bug. Use targeted
