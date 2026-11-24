@@ -71,8 +71,8 @@ disk for the build (~5 GiB) plus the packs you install (147.8 GiB for Hy4, 122.6
 Nothing needs root.
 
 ```bash
-git clone https://github.com/andreasknopke/basalt-on-spark
-cd basalt-on-spark
+git clone https://github.com/agostino-code/basalt-spark-recipes
+cd basalt-spark-recipes
 
 ./install-basalt.sh --model hy4     # the Hy4-flash lane
 ./install-basalt.sh --model qwen    # the Qwen3.8-Flash-Next lane, in the same engine tree

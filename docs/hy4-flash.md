@@ -55,8 +55,8 @@ One script builds the whole lane with the versions this recipe was measured with
 `8172978`, CUDA 13, `CMAKE_CUDA_ARCHITECTURES=121`, the NVFP4 pack `Hy4-flash-NVFP4` (147.8 GiB):
 
 ```bash
-git clone https://github.com/andreasknopke/basalt-on-spark
-cd basalt-on-spark
+git clone https://github.com/agostino-code/basalt-spark-recipes
+cd basalt-spark-recipes
 
 ./install-basalt.sh --model hy4              # text only: 4 slots x 262144 — the agent configuration
 ./install-basalt.sh --model hy4 --vision     # image input: 1 slot, 262144 total

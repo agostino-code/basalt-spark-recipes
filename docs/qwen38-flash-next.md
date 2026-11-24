@@ -106,8 +106,8 @@ One script builds the lane with the versions this recipe was measured with — p
 `CMAKE_CUDA_ARCHITECTURES=121`, the `Qwen3.8-FN-NVFP4-DQ6_K` pack (122.6 GiB):
 
 ```bash
-git clone https://github.com/andreasknopke/basalt-on-spark
-cd basalt-on-spark
+git clone https://github.com/agostino-code/basalt-spark-recipes
+cd basalt-spark-recipes
 
 ./install-basalt.sh --model qwen              # basalt-port/ (the shared tree), port 30001, int8 KV
 ./install-basalt.sh --model qwen --pack /mnt/Qwen3.8-FN-NVFP4-DQ6_K.basalt   # pack you already have
