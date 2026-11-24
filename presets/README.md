@@ -23,6 +23,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV | the measured baseline; port 30001 |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV | the largest configuration that measured cleanly |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV | one full window at a time |
+| `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV | fp16 quality with no batch windows; `--parallel` 2+ refuses it |
 
 ## Measured
 
@@ -37,6 +38,7 @@ cost:
 | `qwen-2` under load | two ~89k-token prompts at once: both completed, 90.2 s wall, TTFT 42.9 / 51.9 s. |
 | `--spec` on Hy4 | 4 is worse (struct 33.0 vs 39.4 tok/s); 8 is level with 6 (39.3 / 19.3 vs 39.4 / 19.6). Keep 6. |
 | `qwen --kv k8v4` / `q4_0` | accepted at one slot and answered; not quality-measured, and not tried at four slots. |
+| `qwen` fp16 | works with one slot; at `--parallel 2` (and 4) the server starts, then the first request fails with `--batch, stage 1: verify: batch windows need INT8 K/V without rotation ... (--kv int8)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
 
 Not tested: `--route-tail-skip` / `--route-prior` (they need experts off the card; this box keeps all

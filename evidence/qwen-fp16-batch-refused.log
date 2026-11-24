@@ -1,0 +1,16 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] qwen3.8-flash-next  kv=fp16 ctx=262144 (524288/2 slots) batch=2 spec=8 temp=1.0 top_p=0.95 top_k=20
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] ready    http://127.0.0.1:30001/v1  openai+anthropic  stats http://127.0.0.1:30001/
+[server] network  http://192.168.1.241:30001/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=21.8GB pool-affinity=auto pool=14
+[server] loading model weights [============>           ]  35.6/68.4 GiB  3053 MB/s
+[server] warning: the device-planned MoE tail is off: every expert is resident
+[server] loading model weights [=======================>]  67.8/68.4 GiB  0 MB/s
+[server] kv       1.3/14.0GiB cuda0 elastic slots=2
+[server] error: --batch, stage 1: verify: batch windows need INT8 K/V without rotation, resident or streamed (--kv int8)
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] stopping (Ctrl+C again to force)
+[server] stopped

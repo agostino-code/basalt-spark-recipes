@@ -44,8 +44,9 @@ not tested*; both appendices are that validation for their pack.
 * [evidence/](evidence/) — the raw logs: the Qwen lane (`lane.log`, `smoke.log`, `basalt-bench.log`,
   `quality.log`, `bench-random-body.log`, `lane-quiet.log`), and the Hy4 lane after the Engram fix
   (`hy4-quality-f9bf55aa.log`, `hy4-quality-fp8.log`, `hy4-smoke-f9bf55aa.log`), the preset smoke
-  (`presets-smoke.log`), the two-slot Qwen run (`qwen-two-slots-89k.log`), plus the one RAM-tier
-  fault seen before dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
+  (`presets-smoke.log`), the two-slot Qwen run (`qwen-two-slots-89k.log`), the fp16 single-slot
+  check and its batch refusal (`qwen-fp16-single.log`, `qwen-fp16-batch-refused.log`), plus the one
+  RAM-tier fault seen before dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
@@ -110,7 +111,7 @@ The flags that matter:
 | `--no-smoke` | skip the smoke test |
 | `--vision` | Hy4 only: the single-slot image configuration (`--parallel 1 --max-context 262144 --fit-max-tokens --vision dynamic`); refused with `--model qwen`, applied to Hy4 only with `--model all` |
 | `--install-unit` | write the systemd `--user` unit(s) (`hy4-basalt` / `qwen-basalt`); they are left disabled on purpose |
-| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen defaults to int8; single lane only |
+| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen's batch slots take only int8; single lane only |
 | `-h`, `--help` | usage |
 
 `--pack`, `--port` and `--kv` describe one lane, so the installer refuses them with `--model all`.
@@ -149,6 +150,7 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV |
+| `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV — fp16 only without batch slots |
 
 `hy4-fp8` halves the KV for +0.004 KLD and no top-1 loss; every preset's tested numbers are in
 [presets/README.md#measured](presets/README.md#measured).

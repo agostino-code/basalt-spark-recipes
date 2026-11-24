@@ -39,7 +39,7 @@
 #   ./install-basalt.sh --dir /opt/basalt-port     # engine tree elsewhere (or export BASALT_DIR)
 #   ./install-basalt.sh --install-unit             # also install the systemd --user unit(s), disabled
 #   ./install-basalt.sh --pack /mnt/x.basalt       # single model: use a pack you already have
-#   ./install-basalt.sh --port 30100 --kv fp16     # single model: another port, another KV format
+#   ./install-basalt.sh --model hy4 --port 30100 --kv fp8   # single model: another port, another KV
 #   ./install-basalt.sh --vision                   # Hy4 only: single-slot image configuration
 #   ./install-basalt.sh --skip-pack                # build only (no pack, no lane, no smoke test)
 #   ./install-basalt.sh --jobs 8 --no-smoke
@@ -111,6 +111,15 @@ if [ "$MODEL" = all ]; then
     [ -z "$KV" ] || die "--kv names one lane's KV format — install one model at a time for that flag
        (--model hy4 --kv ... / --model qwen --kv ...)"
 fi
+# The Qwen lane is always written with four batch slots, and the engine's batch windows verify only
+# int8 K/V: another format starts and then fails on the first request ("--batch, stage 1: verify:
+# batch windows need INT8 K/V without rotation ... (--kv int8)"). Upstream 0.5.6 refuses it at the
+# start; this pin does not, so refuse it before the machine is touched.
+if [ "$MODEL" = "qwen" ] && [ -n "$KV" ] && [ "$KV" != "int8" ]; then
+    die "--kv $KV: the Qwen lane's four batch slots need --kv int8 (batch windows verify only INT8
+       K/V). fp16 is single-slot only: install with the default and run
+       ./run.sh --preset qwen-fp16."
+fi
 if [ "$VISION" = 1 ]; then
     case "$MODEL" in
         qwen) die "--vision is the Hy4-Flash single-slot image configuration; the Qwen lane was
@@ -180,6 +189,8 @@ lane_config() {
     # The Qwen start script carries its KV as a runtime setting (KV=${KV:-int8}, --kv "$KV"), exactly
     # like the measured script in the tree; the Hy4 lane has no KV line, so --kv is baked in instead
     # (the old Hy4 installer did the same).
+    # The Qwen batch slots' --kv int8 requirement is checked with the flags, before the machine is
+    # touched: this installer always writes four batch slots for that lane.
     KV_FLAG=""
     if [ "$LANE" = "qwen" ]; then
         KV_FLAG=' --kv "$KV"'

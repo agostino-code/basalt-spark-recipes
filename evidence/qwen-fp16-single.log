@@ -1,0 +1,17 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] qwen3.8-flash-next  kv=fp16 ctx=262144 spec=8 temp=1.0 top_p=0.95 top_k=20
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] ready    http://127.0.0.1:30001/v1  openai+anthropic  stats http://127.0.0.1:30001/
+[server] network  http://192.168.1.241:30001/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=15.2GB pool-affinity=auto pool=14
+[server] loading model weights [=============>          ]  39.8/68.4 GiB  3036 MB/s
+[server] warning: the device-planned MoE tail is off: every expert is resident
+[server] loaded   68.4GiB 30.1s
+[server] kv       1.0/7.1GiB cuda0 elastic
+[server] weights  loaded, ctx=262144 images=off
+[server] thinking budget 32 tokens, output cap 64 (answer-room auto)
+[server] s1 done  pp=58/0c 0.5s  tg=32 66.2t/s acc=93% dl=3.6  ttft=0.5s  end=stop
+[server] stopping (Ctrl+C again to force)
+[server] stopped

@@ -189,6 +189,13 @@ kv=int8 spec=8`; `/v1/models` exposes `max_model_len: 262144`.
 Measured, at start: `loaded 68.4GiB 54.1s`, `kv 1.5/15.2GiB cuda0 elastic slots=4`,
 `par=4 ctx/slot=262144, others queue`, `ctx=262144 images=off`.
 
+`--kv fp16` is the model's default and is **single-slot only** here: with `--parallel` 2 or more the
+server starts, but the first request fails with `--batch, stage 1: verify: batch windows need INT8
+K/V without rotation, resident or streamed (--kv int8)` — the batch window verifies only an int8
+cache. Upstream 0.5.6 refuses that combination at the start; this pin fails at the first request
+instead. `./run.sh --preset qwen-fp16` is the supported fp16 shape (one slot, 262,144 tokens,
+15.2 GiB of KV).
+
 ### Acceptance test before every run
 
 `tools/qwen-lane-check.py` exercises the shape that faulted the Hy4-flash lane (a large prompt prefix
