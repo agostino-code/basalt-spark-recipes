@@ -17,7 +17,7 @@ time.
 with paths and cross-repo links updated, and the Hy4 appendix's stale port pin (`df6a10cf`) corrected
 to the `f9bf55aa` this unified installer builds. This README is the shared install and the unified view.
 
-What is ours is small: the fork, the two patches, the lane configuration and the measurements. The
+What is ours is small: the fork, the three patches, the lane configuration and the measurements. The
 engine, the port, the packs and the models are other people's work — see [Credits](#credits). The
 port's own README measures the RTX Spark N1X and lists the DGX Spark as *the same GPU generation but
 not tested*; both appendices are that validation for their pack.
@@ -37,6 +37,10 @@ not tested*; both appendices are that validation for their pack.
 * [patches/0002-qwen-fp16-batch.patch](patches/0002-qwen-fp16-batch.patch) — Qwen's batch windows
   with FP16 K/V: the segment K/V append stores the resident FP16 pools, so `--parallel` 2–4 works
   with `--kv fp16` (streamed FP16 is refused).
+* [patches/0003-hy4-large-slot-chunks.patch](patches/0003-hy4-large-slot-chunks.patch) — a per-slot
+  context above 262,144 uses 8,192-row prompt chunks: the ~15k-row NVFP4 `moe-down` launch faults on
+  sm_121. Two 524,288-token windows and a single 1,048,576 one pass at 80k/200k prompts; the
+  4 × 262,144 lane keeps its measured 16,384-row chunks.
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
   concurrency ladder and the Qwen acceptance check:
   * [tools/basalt-repro.py](tools/basalt-repro.py) — deterministic Hy4 crash reproduction (`crash`, `ladder`, `pair`).
@@ -51,8 +55,8 @@ not tested*; both appendices are that validation for their pack.
   (`qwen-fp16-batch-single.log`, `-pair.log`, `-quad.log`, `-full4.log`), the int8 regression and the
   resident refusal (`qwen-batch-int8-regression.log`, `qwen-fp16-resident-refused.log`), the batch
   logprob comparison (`qwen-batch-logprobs.log`), the pre-patch fp16 refusal (`qwen-fp16-batch-refused.log`),
-  plus the one RAM-tier fault seen before dropping the measurement base's page cache
-  (`hy4-ram-tier-fault.log`).
+  the long Hy4 windows after 0003 (`hy4-long-2x524.log`, `hy4-long-1m.log`), plus the one RAM-tier
+  fault seen before dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
@@ -97,7 +101,7 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, free disk (160 GiB for the Hy4 pack, 130 GiB for Qwen) | seconds |
 | 2 | engine tree: clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aab0b507e2130db34c2463b209c319d8e2`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 is in the pinned commit, 0002 on top | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 is in the pinned commit, 0002 and 0003 on top | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `basalt-port/.venv` and installs the pinned `requirements.txt` when the venv is missing | ~1 min |
 | 6 | downloads each selected pack into `basalt-port/models/` when it is missing or incomplete, resumable and size-checked | 1–3 h per pack |
@@ -152,6 +156,8 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV — the measured baseline |
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV — half the KV, the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV — lower memory |
+| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV — needs patch 0003 |
+| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — needs patch 0003 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |
@@ -253,6 +259,15 @@ move by ~0.1 nats and a near-tie token can flip — the unchanged int8 batch fli
 the variance is the batch path's, not the new FP16 store. Use one slot when exact reproduction
 matters. Four full FP16 windows spend 30.4 GiB of KV and push ~30 GB of experts to RAM, so int8 stays
 the default shape.
+
+[patches/0003-hy4-large-slot-chunks.patch](patches/0003-hy4-large-slot-chunks.patch) makes a per-slot
+context above 262,144 usable. A ~15k-row prompt chunk faults in the NVFP4 `moe-down` launch on sm_121
+(`prefill mmq: moe-down` with `CUDA_LAUNCH_BLOCKING=1`; the unblocked tag is the sticky
+`quantize(gemm)`); two 524,288-token slots or one 1,048,576 slot died on an 80,031-token prompt while
+4 × 262,144 passed the same prompt. Tiling the Q8_0 rows and an 8 MiB staging guard did not change it.
+The patch caps the prompt chunk at 8,192 rows only when the per-slot context is above 262,144: the
+80k and 200k prompts then pass on 2 × 524,288 (140 s and 267 s) and 80k on one 1,048,576 slot (139 s).
+The root cause is still open, and a full 524k/1M prompt is not measured.
 
 None of the patches is upstreamed; this repository offers them as files.
 

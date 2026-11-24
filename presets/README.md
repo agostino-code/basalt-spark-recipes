@@ -19,6 +19,8 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV | the measured agent baseline; port 30000 |
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV | half the KV (~15 → ~8.7 GiB), the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV | lower memory, shorter queue |
+| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; needs patch 0003 |
+| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; needs patch 0003 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` | image input; mutually exclusive with the four-slot shape |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV | the measured baseline; port 30001 |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV | the largest configuration that measured cleanly |
@@ -29,7 +31,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 
 ## Measured
 
-All ten presets were started on the Spark (pin `f9bf55aa` + patch 0002, 2026-11-24) and answered a completion
+All twelve presets were started on the Spark (pin `f9bf55aa` + patches 0002/0003, 2026-11-24) and answered a completion
 (HTTP 200); the banners confirmed the shape (`kv=fp8`, two slots, `vision=gpu0`). What the variants
 cost:
 
@@ -43,6 +45,7 @@ cost:
 | `qwen` fp16 batch (patch 0002) | two slots and four slots × 131,072 start, answer and show no faults; four full 262,144-token fp16 windows also start and answer, but take 30.4 GiB of KV. |
 | `qwen` batch numerics | the slots are not bitwise against a one-slot window: the same greedy prompt moves a row's logits by ~0.1 nats and a near-tie token can flip. The unchanged int8 batch does the same, so it is the 0.5.0 batch path, not the FP16 store; one slot for exact reproduction. |
 | `qwen` int8 regression | the unchanged int8 batch path with two slots still answers. |
+| `hy4-2x524` / `hy4-1m` (patch 0003) | an 80k-token prompt passes on both (2 × 524,288: 200, 140 s; 1 × 1,048,576: 200, 139 s); 2 × 524,288 also passes 200k tokens (200, 267 s). A full 524k/1M prompt is not measured. |
 | `qwen` fp16 + `--kv-resident` | refused at the batch init: `a batch window's FP16 K/V must be resident (drop --kv-resident)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
 

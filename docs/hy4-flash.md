@@ -115,7 +115,7 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 160 GiB free for the pack | seconds |
 | 2 | clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aa`**, the commit we validated, into `basalt-port/` | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — the pinned commit carries 0001 (NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors); 0002 is Qwen-only | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — the pinned commit carries 0001 (NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors); 0002 is Qwen-only, 0003 caps the prompt chunk for per-slot contexts above 262,144 | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Hy4-flash-Basalt](https://huggingface.co/jesdga/Hy4-flash-Basalt) into `models/`, resumable and size-checked | 1–3 h |
@@ -305,14 +305,17 @@ per-layer staging costs nothing measurable here, so this is a workaround with no
   `expert 376 of layer 2 is not in RAM`. Dropping the base's cache too brought the plan back to
   512 of 512 experts on the card, where three sequential requests ran. The lane's start script drops
   only the pack, not a base file downloaded for measurement.
-* **More than 262,144 tokens per slot is not stable.** The engine accepts
+* **More than 262,144 tokens per slot needs a smaller prompt chunk.** The engine accepts
   `--parallel 2 --max-context 1048576` (2 × 524,288) and a single 1,048,576 slot, and a 16k prompt
   runs; an 80,031-token prompt then died in `prefill mmq: quantize(gemm)` (an illegal memory access)
   on both, while the same prompt on 4 × 262,144 passed. With `CUDA_LAUNCH_BLOCKING=1` the exact
   launch is `moe-down` (NVFP4) — the product class of the original sm_121 fault; the unblocked tag
   is the sticky one. Neither tiling the Q8_0 MMQ rows nor an 8 MiB guard after the staging buffers
-  changed it. So the model's 1M context is not reachable through this lane yet: 262,144 per slot is
-  the tested maximum, and the long-window presets were withdrawn.
+  changed it. **Patch 0003** caps the prompt chunk at 8,192 rows when the per-slot context is above
+  262,144: 80k and 200k prompts then pass on 2 × 524,288 (140 s and 267 s), and 80k on one 1,048,576
+  slot (139 s); the 4 × 262,144 lane keeps 16,384-row chunks and its measured prefill. The root cause
+  (the tiled NVFP4 `moe-down` launch at ~15k rows) is still open, and a full 524k/1M prompt is not
+  measured.
 * **compute-sanitizer is not usable at this model size.** `memcheck` needs shadow memory; with an
   86 GiB model resident, the engine aborts loading (`RAM ran out loading (839 MiB free)`) and the
   expert tier shrinks to 11 of 512 experts — which changes the state and hides the bug. Use targeted
