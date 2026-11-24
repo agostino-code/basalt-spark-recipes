@@ -1,0 +1,73 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] qwen3.8-flash-next  ctx=262144 (1048576/4 slots) kv=int8 batch=4 spec=8 temp=1.0 top_p=0.95 top_k=20
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] ready    http://127.0.0.1:30001/v1  openai+anthropic  stats http://127.0.0.1:30001/
+[server] network  http://192.168.1.241:30001/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=22.8GB pool-affinity=auto pool=14
+[server] loading model weights [===========>            ]  31.7/68.4 GiB  2885 MB/s
+[server] loading model weights [=======================>]  67.8/68.4 GiB  1933 MB/s
+[server] warning: the device-planned MoE tail is off: every expert is resident
+[server] loaded   68.4GiB 34.0s
+[server] kv       1.5/15.2GiB cuda0 elastic slots=4
+[server] slots    par=4 ctx/slot=262144, others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] live | s1 tg=1/128 | total 0t/s
+[server] s1 done  pp=3988/0c 2.4s 1650t/s  tg=62 60.7t/s acc=78% dl=3.3  ttft=2.5s  end=stop
+[server] s2 read  pp=11904/63624 2147t/s 6s
+[server] s2 read  pp=23808/63624 2152t/s 11s
+[server] s2 read  pp=35216/63624 2160t/s 16s
+[server] s2 read  pp=45632/63624 2140t/s 21s
+[server] s2 read  pp=55616/63624 2102t/s 26s
+[server] live | s2 tg=1/128 | total 0t/s
+[server] live | s2 tg=119/128 58.5t/s | total 58t/s
+[server] s2 done  pp=63624/0c 30.7s 2072t/s  tg=128 55.8t/s acc=82% dl=2.9  ttft=30.8s  end=length
+[server] s3 read  pp=11248/185579 2158t/s 5s
+[server] s3 read  pp=23680/185579 2185t/s 11s
+[server] s3 read  pp=34928/185579 2174t/s 16s
+[server] s3 read  pp=46176/185579 2154t/s 21s
+[server] s3 read  pp=56832/185579 2131t/s 27s
+[server] s3 read  pp=68080/185579 2122t/s 32s
+[server] s3 read  pp=78736/185579 2104t/s 37s
+[server] s3 read  pp=89984/185579 2084t/s 43s
+[server] s3 read  pp=100640/185579 2075t/s 49s
+[server] s3 read  pp=110704/185579 2068t/s 54s
+[server] s3 read  pp=120176/185579 2052t/s 59s
+[server] s3 read  pp=130832/185579 2035t/s 64s
+[server] s3 read  pp=141488/185579 2027t/s 70s
+[server] s3 read  pp=150960/185579 2012t/s 75s
+[server] s3 read  pp=161024/185579 1992t/s 81s
+[server] s3 read  pp=170496/185579 1978t/s 86s
+[server] s3 read  pp=179290/185579 1960t/s 91s
+[server] live | s3 tg=1/128 | total 0t/s
+[server] s3 done  pp=185579/0c 95.5s 1943t/s  tg=55 51.0t/s acc=74% dl=2.9  ttft=95.6s  end=stop
+[server] s4 read  pp=10517/252426 2071t/s 5s
+[server] s4 read  pp=21653/252426 2145t/s 10s
+[server] s4 read  pp=32789/252426 2130t/s 15s
+[server] s4 read  pp=44544/252426 2125t/s 21s
+[server] s4 read  pp=55680/252426 2122t/s 26s
+[server] s4 read  pp=66197/252426 2104t/s 31s
+[server] s4 read  pp=77333/252426 2084t/s 37s
+[server] s4 read  pp=88469/252426 2078t/s 43s
+[server] s4 read  pp=98368/252426 2062t/s 48s
+[server] s4 read  pp=108266/252426 2053t/s 53s
+[server] s4 read  pp=118165/252426 2042t/s 58s
+[server] s4 read  pp=127445/252426 2025t/s 63s
+[server] s4 read  pp=137344/252426 2016t/s 68s
+[server] s4 read  pp=147242/252426 2008t/s 73s
+[server] s4 read  pp=155904/252426 1988t/s 78s
+[server] s4 read  pp=165802/252426 1975t/s 84s
+[server] s4 read  pp=175701/252426 1962t/s 90s
+[server] s4 read  pp=184362/252426 1950t/s 95s
+[server] s4 read  pp=193024/252426 1931t/s 100s
+[server] s4 read  pp=202922/252426 1917t/s 106s
+[server] s4 read  pp=211584/252426 1905t/s 111s
+[server] s4 read  pp=220245/252426 1888t/s 117s
+[server] s4 read  pp=228906/252426 1880t/s 122s
+[server] s4 read  pp=237568/252426 1861t/s 128s
+[server] s4 read  pp=246231/252426 1846t/s 133s
+[server] live | s4 tg=1/128 | total 0t/s
+[server] s4 done  pp=252426/0c 137.8s 1832t/s  tg=57 52.0t/s acc=76% dl=3.0  ttft=137.8s  end=stop
+[server] stopping (Ctrl+C again to force)
+[server] stopped

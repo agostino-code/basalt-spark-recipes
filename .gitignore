@@ -1,0 +1,5 @@
+# The engine tree is a working checkout of the fork andreasknopke/basalt-arm-sm121
+# (branch hy4-port, pinned commit). install-basalt.sh clones it here if missing;
+# its build/, .venv/ and models/ (the NVFP4 packs, ~270 GiB) never enter this repo.
+/basalt-port/
+.DS_Store

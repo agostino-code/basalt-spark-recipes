@@ -1,0 +1,19 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] qwen3.8-flash-next  ctx=262144 (1048576/4 slots) kv=int8 batch=4 spec=8 temp=1.0 top_p=0.95 top_k=20
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] ready    http://127.0.0.1:30001/v1  openai+anthropic  stats http://127.0.0.1:30001/
+[server] network  http://192.168.1.241:30001/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=22.8GB pool-affinity=auto pool=14
+[server] loading model weights [===========>            ]  31.5/68.4 GiB  3022 MB/s
+[server] loading model weights [=======================>]  67.8/68.4 GiB  1943 MB/s
+[server] warning: the device-planned MoE tail is off: every expert is resident
+[server] loaded   68.4GiB 34.2s
+[server] kv       1.5/15.2GiB cuda0 elastic slots=4
+[server] slots    par=4 ctx/slot=262144, others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] s1 done  pp=57/0c 0.5s  tg=8 52.1t/s acc=89% dl=2.7  ttft=0.5s  end=length
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] stopping (Ctrl+C again to force)
+[server] stopped
