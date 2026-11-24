@@ -133,8 +133,8 @@ model_meta() {
             M_PACK_BYTES=158746168309              # 147.8 GiB, verified on our box
             M_ALIAS="hy4-flash"
             M_PORT_DEFAULT=30000
-            M_KV_DEFAULT=""                        # engine default (fp8): what the Hy4 lane was measured with
-            M_KV_LABEL="default fp8"
+            M_KV_DEFAULT=""                        # engine default (fp16): what the Hy4 lane was measured with
+            M_KV_LABEL="default fp16"
             M_SCRIPT="start-hy4.sh"
             M_UNIT="hy4-basalt"
             M_DISK_GIB=160                         # the old installer's generous check for 147.8 GiB

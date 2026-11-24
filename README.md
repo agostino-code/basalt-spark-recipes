@@ -58,7 +58,7 @@ not tested*; both appendices are that validation for their pack.
 | Pack | `Hy4-flash-NVFP4.basalt`, 147.8 GiB | `Qwen3.8-FN-NVFP4-DQ6_K.basalt`, 122.6 GiB |
 | Port | 30000 | 30001 |
 | Slots / context | 4 × 262,144 (1,048,576 cells) | 4 × 262,144 (1,048,576 cells) |
-| KV | engine default: fp8 | int8, 15.2 GiB for four windows |
+| KV | engine default: fp16, ≈15 GiB for four windows | int8, 15.2 GiB for four windows |
 | Alias | `hy4-flash` | `qwen3.8-flash-next` |
 | Start script | `basalt-port/start-hy4.sh` | `basalt-port/start-qwen.sh` |
 
@@ -107,7 +107,7 @@ The flags that matter:
 | `--no-smoke` | skip the smoke test |
 | `--vision` | Hy4 only: the single-slot image configuration (`--parallel 1 --max-context 262144 --fit-max-tokens --vision dynamic`); refused with `--model qwen`, applied to Hy4 only with `--model all` |
 | `--install-unit` | write the systemd `--user` unit(s) (`hy4-basalt` / `qwen-basalt`); they are left disabled on purpose |
-| `--kv <fmt>` | KV format; Hy4 uses the engine default fp8, Qwen defaults to int8; single lane only |
+| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen defaults to int8; single lane only |
 | `-h`, `--help` | usage |
 
 `--pack`, `--port` and `--kv` describe one lane, so the installer refuses them with `--model all`.
