@@ -1,0 +1,30 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] qwen3.8-flash-next  kv=fp16 ctx=131072 (524288/4 slots) batch=4 spec=8 temp=1.0 top_p=0.95 top_k=20
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] ready    http://127.0.0.1:30001/v1  openai+anthropic  stats http://127.0.0.1:30001/
+[server] network  http://192.168.1.241:30001/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=21.6GB pool-affinity=auto pool=14
+[server] loading model weights [============>           ]  36.7/68.4 GiB  3182 MB/s
+[server] warning: the device-planned MoE tail is off: every expert is resident
+[server] loaded   68.4GiB 32.6s
+[server] kv       1.7/14.2GiB cuda0 elastic slots=4
+[server] slots    par=4 ctx/slot=131072, others queue
+[server] weights  loaded, ctx=131072 images=off
+[server] thinking budget 32 tokens, output cap 64 (answer-room auto)
+[server] thinking budget 32 tokens, output cap 64 (answer-room auto)
+[server] thinking budget 32 tokens, output cap 64 (answer-room auto)
+[server] thinking budget 32 tokens, output cap 64 (answer-room auto)
+[server] live | s1 tg=4/64 | s2 tg=1/64 | total 0t/s
+[server] thinking budget reached (32 tokens), wrapping up
+[server] live | s1 tg=36/64 14.9t/s | s2 tg=31/64 15.3t/s | s3 tg=24/64 14.8t/s | s4 tg=22/64 18.0t/s | total 63t/s
+[server] thinking budget reached (32 tokens), wrapping up
+[server] thinking budget reached (32 tokens), wrapping up
+[server] thinking budget reached (32 tokens), wrapping up
+[server] s1 done  pp=74/0c 0.4s  tg=55 14.2t/s acc=100% dl=2.6  ttft=0.8s  end=stop
+[server] s2 done  pp=74/69c 0.2s  tg=55 14.4t/s acc=92% dl=2.3  ttft=1.2s  end=stop
+[server] s3 done  pp=74/69c 0.5s  tg=55 25.7t/s acc=87% dl=2.2  ttft=1.6s  end=stop
+[server] s4 done  pp=74/69c 0.2s  tg=55 39.8t/s acc=82% dl=2.4  ttft=2.0s  end=stop
+[server] stopping (Ctrl+C again to force)
+[server] stopped

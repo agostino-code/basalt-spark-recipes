@@ -115,7 +115,7 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 160 GiB free for the pack | seconds |
 | 2 | clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aa`**, the commit we validated, into `basalt-port/` | ~1 min |
-| 3 | applies `patches/0001-spark-sm121-fixes.patch` when the tree does not already carry it — the pinned fork commit does: NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — the pinned commit carries 0001 (NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors); 0002 is Qwen-only | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Hy4-flash-Basalt](https://huggingface.co/jesdga/Hy4-flash-Basalt) into `models/`, resumable and size-checked | 1–3 h |

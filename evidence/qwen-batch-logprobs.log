@@ -1,0 +1,26 @@
+Qwen 2 slots, same greedy prompt, first reasoning tokens (logprobs), pin f9bf55aa + 0002
+lp-fp16pair-1.json | finish length | tokens 24
+    'We' -0.02096
+    ' need' -3e-05
+    ' to' -0.86523
+    ' respond' -0.03535
+lp-fp16pair-2.json | finish length | tokens 24
+    'We' -0.01625
+    ' need' -3e-05
+    ' answer' -0.79006
+    ' user' -0.12543
+lp-fp16single-1.json | finish length | tokens 24
+    'We' -0.02096
+    ' need' -3e-05
+    ' answer' -0.74389
+    ' user' -0.12734
+lp-int8pair-1.json | finish length | tokens 24
+    'We' -0.0216
+    ' need' -4e-05
+    ' answer' -0.78722
+    ' user' -0.14162
+lp-int8pair-2.json | finish length | tokens 24
+    'We' -0.0143
+    ' need' -2e-05
+    ' answer' -0.96288
+    ' user' -0.13713

@@ -17,7 +17,7 @@ time.
 with paths and cross-repo links updated, and the Hy4 appendix's stale port pin (`df6a10cf`) corrected
 to the `f9bf55aa` this unified installer builds. This README is the shared install and the unified view.
 
-What is ours is small: the fork, the one patch, the lane configuration and the measurements. The
+What is ours is small: the fork, the two patches, the lane configuration and the measurements. The
 engine, the port, the packs and the models are other people's work — see [Credits](#credits). The
 port's own README measures the RTX Spark N1X and lists the DGX Spark as *the same GPU generation but
 not tested*; both appendices are that validation for their pack.
@@ -34,6 +34,9 @@ not tested*; both appendices are that validation for their pack.
   window; `./run.sh --list-presets` lists them.
 * [patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch) — the shared sm_121
   patch: NVFP4 on the tiled MMQ path, the expert ring off, product names in the MMQ launch errors.
+* [patches/0002-qwen-fp16-batch.patch](patches/0002-qwen-fp16-batch.patch) — Qwen's batch windows
+  with FP16 K/V: the segment K/V append stores the resident FP16 pools, so `--parallel` 2–4 works
+  with `--kv fp16` (streamed FP16 is refused).
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
   concurrency ladder and the Qwen acceptance check:
   * [tools/basalt-repro.py](tools/basalt-repro.py) — deterministic Hy4 crash reproduction (`crash`, `ladder`, `pair`).
@@ -44,9 +47,12 @@ not tested*; both appendices are that validation for their pack.
 * [evidence/](evidence/) — the raw logs: the Qwen lane (`lane.log`, `smoke.log`, `basalt-bench.log`,
   `quality.log`, `bench-random-body.log`, `lane-quiet.log`), and the Hy4 lane after the Engram fix
   (`hy4-quality-f9bf55aa.log`, `hy4-quality-fp8.log`, `hy4-smoke-f9bf55aa.log`), the preset smoke
-  (`presets-smoke.log`), the two-slot Qwen run (`qwen-two-slots-89k.log`), the fp16 single-slot
-  check and its batch refusal (`qwen-fp16-single.log`, `qwen-fp16-batch-refused.log`), plus the one
-  RAM-tier fault seen before dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
+  (`presets-smoke.log`), the two-slot Qwen run (`qwen-two-slots-89k.log`), the FP16 batch windows
+  (`qwen-fp16-batch-single.log`, `-pair.log`, `-quad.log`, `-full4.log`), the int8 regression and the
+  resident refusal (`qwen-batch-int8-regression.log`, `qwen-fp16-resident-refused.log`), the batch
+  logprob comparison (`qwen-batch-logprobs.log`), the pre-patch fp16 refusal (`qwen-fp16-batch-refused.log`),
+  plus the one RAM-tier fault seen before dropping the measurement base's page cache
+  (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
@@ -91,7 +97,7 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, free disk (160 GiB for the Hy4 pack, 130 GiB for Qwen) | seconds |
 | 2 | engine tree: clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aab0b507e2130db34c2463b209c319d8e2`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
-| 3 | applies `patches/0001-spark-sm121-fixes.patch` when the tree does not already carry it — the pinned fork commit does | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 is in the pinned commit, 0002 on top | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `basalt-port/.venv` and installs the pinned `requirements.txt` when the venv is missing | ~1 min |
 | 6 | downloads each selected pack into `basalt-port/models/` when it is missing or incomplete, resumable and size-checked | 1–3 h per pack |
@@ -111,7 +117,7 @@ The flags that matter:
 | `--no-smoke` | skip the smoke test |
 | `--vision` | Hy4 only: the single-slot image configuration (`--parallel 1 --max-context 262144 --fit-max-tokens --vision dynamic`); refused with `--model qwen`, applied to Hy4 only with `--model all` |
 | `--install-unit` | write the systemd `--user` unit(s) (`hy4-basalt` / `qwen-basalt`); they are left disabled on purpose |
-| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen's batch slots take only int8; single lane only |
+| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen defaults to int8 (fp16 works with patch 0002); single lane only |
 | `-h`, `--help` | usage |
 
 `--pack`, `--port` and `--kv` describe one lane, so the installer refuses them with `--model all`.
@@ -150,7 +156,9 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV |
-| `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV — fp16 only without batch slots |
+| `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV — one full window |
+| `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV — needs patch 0002 |
+| `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV — needs patch 0002; 15.2 GiB of KV |
 
 `hy4-fp8` halves the KV for +0.004 KLD and no top-1 loss; every preset's tested numbers are in
 [presets/README.md#measured](presets/README.md#measured).
@@ -193,6 +201,7 @@ and [issue #13](https://github.com/andreasknopke/codec-reverse-bench-leaderboard
 | Decode | **56.7–57.7 tok/s at every depth measured** (63.6k, 185.6k, 252.4k); 68.9 at 4k |
 | Context per request | **262,144-token window** (prompt + answer); a 252,425-token prompt answers correctly and the server reports `ctx=262144 images=off` |
 | KV | **int8, 15.2 GiB for four windows** (elastic, `1.5/15.2GiB` at start, ~15.5 KB per token) |
+| KV (fp16) | patch 0002: 15.2 GiB for two 262,144-token windows, or four 131,072-token ones; four full 262,144 windows need 30.4 GiB |
 | Quality | **PPL 3.3032 ± 0.0436** (base 3.2733), **KLD mean 0.06246**, **same top-1 91.68 %** — the pack card's 3.304 / 0.0624 / 91.65 % reproduced |
 | Four full windows | **does not hold on this box**: four 252,010-token sessions took **621.7 s** wall, TTFT 187–620 s, decode 0.4–34.9 tok/s, almost 8 GB of swap in use |
 | Stability | 0 engine faults in ~25 requests, including the acceptance ladder and the full-window runs |
@@ -214,7 +223,9 @@ with FP32's machine epsilon as the reference does, where bf16's 0.0078 swamped s
 stray byte tokens after a `},` line split. That commit touches Hy4 kernels only; Qwen is untouched.
 One tree, one commit, one `bin/basalt` for both models.
 
-The one patch, [patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch):
+The patches, applied in order:
+
+[patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch):
 
 * **NVFP4 on the tiled MMQ path.** All 16 NVFP4 rows in `src/prefill/mmq/mmq_config.cuh` run tiled
   (`stream_k = false`) instead of stream-k; the tiled path writes straight into `dst`, so no fixup
@@ -230,8 +241,20 @@ The one patch, [patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-f
 Both sm_121 fault fixes are **workarounds, not root causes**: we know which code path faults and that
 the other one does not, not which instruction faults. Both faults are memory-layout dependent. The
 reproduction, the attribution and what remains open are in
-[docs/hy4-flash.md#the-two-sm_121-faults](docs/hy4-flash.md#the-two-sm_121-faults). Neither fix is
-upstreamed; this repository only offers the patch.
+[docs/hy4-flash.md#the-two-sm_121-faults](docs/hy4-flash.md#the-two-sm_121-faults).
+
+[patches/0002-qwen-fp16-batch.patch](patches/0002-qwen-fp16-batch.patch) lifts the batch chain's INT8
+assumption for Qwen. The segment K/V append (`qsa_dec_kv_post_seg`) gains an FP16 store into the
+resident pools, the segment attention is told the slot's format (it already took both), and the batch
+init admits resident FP16, refusing a streamed FP16 cache (the pool resolve copies INT8). Two-slot
+and four-slot FP16 windows start and answer without faults, and the int8 path is unchanged. At this
+pin Qwen's batch windows are **not bitwise identical to a single-slot window**: a batch row's logits
+move by ~0.1 nats and a near-tie token can flip — the unchanged int8 batch flips it the same way, so
+the variance is the batch path's, not the new FP16 store. Use one slot when exact reproduction
+matters. Four full FP16 windows spend 30.4 GiB of KV and push ~30 GB of experts to RAM, so int8 stays
+the default shape.
+
+None of the patches is upstreamed; this repository offers them as files.
 
 ## The traps
 

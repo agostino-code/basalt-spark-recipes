@@ -23,11 +23,13 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV | the measured baseline; port 30001 |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV | the largest configuration that measured cleanly |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV | one full window at a time |
-| `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV | fp16 quality with no batch windows; `--parallel` 2+ refuses it |
+| `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV | one full window in fp16 |
+| `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV | two full windows in fp16; needs patch 0002 |
+| `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV | four windows in fp16 at int8's KV size; needs patch 0002 |
 
 ## Measured
 
-All seven presets were started on the Spark (pin `f9bf55aa`, 2026-11-24) and answered a completion
+All ten presets were started on the Spark (pin `f9bf55aa` + patch 0002, 2026-11-24) and answered a completion
 (HTTP 200); the banners confirmed the shape (`kv=fp8`, two slots, `vision=gpu0`). What the variants
 cost:
 
@@ -38,7 +40,10 @@ cost:
 | `qwen-2` under load | two ~89k-token prompts at once: both completed, 90.2 s wall, TTFT 42.9 / 51.9 s. |
 | `--spec` on Hy4 | 4 is worse (struct 33.0 vs 39.4 tok/s); 8 is level with 6 (39.3 / 19.3 vs 39.4 / 19.6). Keep 6. |
 | `qwen --kv k8v4` / `q4_0` | accepted at one slot and answered; not quality-measured, and not tried at four slots. |
-| `qwen` fp16 | works with one slot; at `--parallel 2` (and 4) the server starts, then the first request fails with `--batch, stage 1: verify: batch windows need INT8 K/V without rotation ... (--kv int8)`. |
+| `qwen` fp16 batch (patch 0002) | two slots and four slots × 131,072 start, answer and show no faults; four full 262,144-token fp16 windows also start and answer, but take 30.4 GiB of KV. |
+| `qwen` batch numerics | the slots are not bitwise against a one-slot window: the same greedy prompt moves a row's logits by ~0.1 nats and a near-tie token can flip. The unchanged int8 batch does the same, so it is the 0.5.0 batch path, not the FP16 store; one slot for exact reproduction. |
+| `qwen` int8 regression | the unchanged int8 batch path with two slots still answers. |
+| `qwen` fp16 + `--kv-resident` | refused at the batch init: `a batch window's FP16 K/V must be resident (drop --kv-resident)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
 
 Not tested: `--route-tail-skip` / `--route-prior` (they need experts off the card; this box keeps all

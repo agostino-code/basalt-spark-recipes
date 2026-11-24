@@ -17,10 +17,10 @@
 # What it does, in order:
 #   1. checks the machine (aarch64, CUDA 13, cmake, gcc, python, free disk for packs that are missing)
 #   2. clones andreasknopke/basalt-arm-sm121 at the pinned commit we validated, or reuses --dir
-#   3. applies patches/0001-spark-sm121-fixes.patch (the sm_121 fixes: NVFP4 tiled MMQ path, expert ring
-#      off, product names in MMQ launch errors) only when the tree does not already carry it
-#   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing or was last built
-#      at another commit — about 10 minutes
+#   3. applies patches/*.patch in order (0001: the sm_121 fixes; 0002: FP16 K/V for Qwen's batch windows)
+#      only when the tree does not already carry each one
+#   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing, a patch was just
+#      applied, or the binary was last built at another commit — about 10 minutes
 #   5. creates the server venv and installs the pinned requirements when .venv is missing
 #   6. downloads each selected model's NVFP4 pack when it is missing or incomplete (147.8 GiB Hy4,
 #      122.6 GiB Qwen, resumable and size-checked)
@@ -59,8 +59,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # carries upstream #556, the Hy4 Engram epsilon fix (Hy4 kernels only, Qwen untouched).
 PORT_REPO="https://github.com/andreasknopke/basalt-arm-sm121.git"
 PORT_COMMIT="f9bf55aab0b507e2130db34c2463b209c319d8e2"   # branch hy4-port, 2026-11-22
-# The two old repositories carried byte-identical copies of this patch; this one file replaces them.
-PATCH="$SCRIPT_DIR/patches/0001-spark-sm121-fixes.patch"
+# The patches are applied in file order: 0001 is already in the pinned commit (its reverse check says
+# so), 0002 (Qwen FP16 batch windows) comes after it. A patch applied now forces a rebuild below.
 
 MODEL="hy4"                                    # old muscle memory: no flag installs the Hy4 lane
 TARGET="${BASALT_DIR:-${SCRIPT_DIR}/basalt-port}"   # one engine tree serves both recipes
@@ -111,14 +111,12 @@ if [ "$MODEL" = all ]; then
     [ -z "$KV" ] || die "--kv names one lane's KV format — install one model at a time for that flag
        (--model hy4 --kv ... / --model qwen --kv ...)"
 fi
-# The Qwen lane is always written with four batch slots, and the engine's batch windows verify only
-# int8 K/V: another format starts and then fails on the first request ("--batch, stage 1: verify:
-# batch windows need INT8 K/V without rotation ... (--kv int8)"). Upstream 0.5.6 refuses it at the
-# start; this pin does not, so refuse it before the machine is touched.
+# The Qwen lane is written with four full windows (1,048,576 cells). FP16 K/V works there with patch
+# 0002, but 30.4 GiB of KV pushes tens of GB of experts to RAM; int8 keeps the same windows at 15.2
+# GiB. Say so, and leave the choice to the caller.
 if [ "$MODEL" = "qwen" ] && [ -n "$KV" ] && [ "$KV" != "int8" ]; then
-    die "--kv $KV: the Qwen lane's four batch slots need --kv int8 (batch windows verify only INT8
-       K/V). fp16 is single-slot only: install with the default and run
-       ./run.sh --preset qwen-fp16."
+    echo "  warning: --kv $KV on the Qwen lane's four full windows needs about 30 GiB of KV and pushes
+       experts to RAM; the default int8, or ./run.sh --preset qwen-fp16-2, is lighter"
 fi
 if [ "$VISION" = 1 ]; then
     case "$MODEL" in
@@ -189,8 +187,7 @@ lane_config() {
     # The Qwen start script carries its KV as a runtime setting (KV=${KV:-int8}, --kv "$KV"), exactly
     # like the measured script in the tree; the Hy4 lane has no KV line, so --kv is baked in instead
     # (the old Hy4 installer did the same).
-    # The Qwen batch slots' --kv int8 requirement is checked with the flags, before the machine is
-    # touched: this installer always writes four batch slots for that lane.
+    # The Qwen lane's FP16 warning is emitted with the flags, before the machine is touched.
     KV_FLAG=""
     if [ "$LANE" = "qwen" ]; then
         KV_FLAG=' --kv "$KV"'
@@ -295,21 +292,28 @@ fi
 HEAD_SHA="$(git -C "$TARGET" rev-parse HEAD)"
 echo "  at $(git -C "$TARGET" rev-parse --short HEAD) — $(git -C "$TARGET" log -1 --format=%s | cut -c1-60)"
 
-# --- 3. the sm_121 patch ---------------------------------------------------------
-say 3/8 "checking the sm_121 fixes"
-# The pinned commit already carries them (the fork merge). The patch is applied only when this script is
-# pointed at a tree that does not — the qwen installer's check, and the reason only one copy of the
-# patch is shipped now: the two old copies were byte-identical.
-[ -f "$PATCH" ] || die "patch missing: $PATCH — run this script from the repository root"
-if git -C "$TARGET" apply --check "$PATCH" 2>/dev/null; then
-    git -C "$TARGET" apply "$PATCH"
-    echo "  applied $(basename "$PATCH")"
-elif git -C "$TARGET" apply --reverse --check "$PATCH" 2>/dev/null; then
-    echo "  already in this commit (the fork carries them) — nothing to do"
-else
-    die "the patch neither applies nor reverses to ${PORT_COMMIT:0:8}: the tree is modified or from
-       another commit (check 'git -C $TARGET status')"
-fi
+# --- 3. the patches ---------------------------------------------------------------
+say 3/8 "checking the patches"
+# 0001 is already in the pinned commit (the fork merge) and says so by reversing; 0002 applies on top.
+# Each file is checked and applied in name order, so a tree with 0001 and without 0002 gets 0002 only.
+PATCHED=0
+shopt -s nullglob
+PATCHES=("$SCRIPT_DIR"/patches/*.patch)
+shopt -u nullglob
+[ "${#PATCHES[@]}" -gt 0 ] || die "no patches in $SCRIPT_DIR/patches — run this script from the repository root"
+for PATCH in "${PATCHES[@]}"; do
+    PATCH_NAME="$(basename "$PATCH")"
+    if git -C "$TARGET" apply --check "$PATCH" 2>/dev/null; then
+        git -C "$TARGET" apply "$PATCH"
+        echo "  applied $PATCH_NAME"
+        PATCHED=1
+    elif git -C "$TARGET" apply --reverse --check "$PATCH" 2>/dev/null; then
+        echo "  $PATCH_NAME already in this tree"
+    else
+        die "$PATCH_NAME neither applies nor reverses at ${PORT_COMMIT:0:8}: the tree is modified or
+       from another commit (check 'git -C $TARGET status')"
+    fi
+done
 
 # --- 4. build --------------------------------------------------------------------
 say 4/8 "building (Release, sm_121) — about 10 minutes"
@@ -318,7 +322,7 @@ say 4/8 "building (Release, sm_121) — about 10 minutes"
 BUILT_AT="$TARGET/build/.port-commit"
 BUILT=""
 [ -f "$BUILT_AT" ] && BUILT="$(cat "$BUILT_AT" 2>/dev/null || true)"
-if [ -x "$TARGET/bin/basalt" ] && [ "$BUILT" = "$HEAD_SHA" ]; then
+if [ -x "$TARGET/bin/basalt" ] && [ "$BUILT" = "$HEAD_SHA" ] && [ "$PATCHED" = 0 ]; then
     echo "  already built at ${HEAD_SHA:0:8}: $TARGET/bin/basalt ($(du -h "$TARGET/bin/basalt" | cut -f1))"
 else
     export PATH="/usr/local/cuda/bin:${PATH}"

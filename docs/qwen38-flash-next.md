@@ -120,7 +120,7 @@ What it does, in order — every step is idempotent:
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 130 GiB free | seconds |
 | 2 | clones `andreasknopke/basalt-arm-sm121` at **`f9bf55aa`**, the commit we validated | ~1 min |
-| 3 | applies `patches/0001-spark-sm121-fixes.patch` when the tree does not already carry it | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one (0001 is in the pinned commit, 0002 on top) | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Qwen3.8-Flash-Next-Basalt](https://huggingface.co/jesdga/Qwen3.8-Flash-Next-Basalt), resumable, size- and sha256-checked | 1–3 h |
@@ -159,6 +159,8 @@ launcher per model — `start-hy4.sh` (four slots × 262,144, `:30000`) and `sta
 ./run.sh qwen --port 30102  # another port, same model
 ./run.sh --preset qwen-2    # two full windows - the largest clean configuration
 ./run.sh --preset qwen-single
+./run.sh --preset qwen-fp16-2   # two full windows in fp16 (patch 0002)
+./run.sh --preset qwen-fp16-4   # four 131,072-token windows in fp16
 ```
 
 The named presets are in [presets/](../presets/); `qwen-agent` is the four-slot baseline above and
@@ -189,12 +191,28 @@ kv=int8 spec=8`; `/v1/models` exposes `max_model_len: 262144`.
 Measured, at start: `loaded 68.4GiB 54.1s`, `kv 1.5/15.2GiB cuda0 elastic slots=4`,
 `par=4 ctx/slot=262144, others queue`, `ctx=262144 images=off`.
 
-`--kv fp16` is the model's default and is **single-slot only** here: with `--parallel` 2 or more the
-server starts, but the first request fails with `--batch, stage 1: verify: batch windows need INT8
-K/V without rotation, resident or streamed (--kv int8)` — the batch window verifies only an int8
-cache. Upstream 0.5.6 refuses that combination at the start; this pin fails at the first request
-instead. `./run.sh --preset qwen-fp16` is the supported fp16 shape (one slot, 262,144 tokens,
-15.2 GiB of KV).
+`--kv fp16` is the model's default. At the pin alone the batch windows refused it — the server
+started, then the first request failed with `--batch, stage 1: verify: batch windows need INT8 K/V
+without rotation, resident or streamed (--kv int8)` (upstream 0.5.6 refuses that combination at the
+start). **Patch 0002 removes that limit**: the segment K/V append now stores resident FP16 pools and
+the segment attention is told the slot's format, so `--parallel` 2–4 works with FP16.
+
+| Shape | KV | Preset | Tested |
+|---|---|---|---|
+| 1 slot × 262,144 | 15.2 GiB | `qwen-fp16` | yes |
+| 2 slots × 262,144 | 15.2 GiB | `qwen-fp16-2` | starts, both slots answer, no faults |
+| 4 slots × 131,072 | 15.2 GiB | `qwen-fp16-4` | starts, all four answer, no faults |
+| 4 slots × 262,144 | 30.4 GiB | — | starts and answers; experts spill to RAM |
+
+The FP16 batch path is **as reproducible as int8's, which is not bitwise against a one-slot window**
+at this pin. The same greedy prompt through one slot and through a batch moves a row's logits by
+~0.1 nats and can flip a near-tie (`>` against `>=` in a `max2` answer). The unchanged int8 batch
+does the same, so this is the 0.5.0 batch path's arithmetic, not the FP16 store: for exact
+reproduction run one slot. Upstream 0.5.6 adds the batch conformance check that pins this down.
+
+FP16 K/V must be **resident**: `--kv-resident` with FP16 is refused at the batch init (the pool
+resolve copies INT8 pools). The int8 lane stays the default because it gives the same four windows
+at half the KV; FP16 is for a two-window lane or a 4 × 131,072 one.
 
 ### Acceptance test before every run
 
