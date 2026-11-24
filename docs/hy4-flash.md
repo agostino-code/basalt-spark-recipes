@@ -74,6 +74,12 @@ card); upstream's 5090 number pins `--expert-cache 4800`. The 0.9881 opencode-be
 **not** a post-fix number — it was measured on `8172978` — and the fix changes Hy4 output, so the
 gate above is the figure to compare across the fix.
 
+With `--kv fp8` (the `hy4-fp8` preset) the same gate reads PPL 17.6522 ± 0.4489, KLD 0.20744,
+top-1 86.30 %: +0.0044 KLD for roughly 6 GiB of KV back. The decode fixtures are level on struct
+and prose (39.3 against 39.4, 19.1 against 19.6 tok/s); `conv` read 22.4 against 24.8 in one run
+each, so we do not claim a speed gain — the trade is memory. The `hy4-2` preset (two slots) and
+`--spec` 4/8 were also measured; `--spec` 4 is worse on `struct` and 8 is level with the default 6.
+
 ---
 
 ## Install

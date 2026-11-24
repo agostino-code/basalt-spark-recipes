@@ -1,0 +1,37 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] qwen3.8-flash-next  kv=int8 ctx=262144 (524288/2 slots) batch=2 spec=8 temp=1.0 top_p=0.95 top_k=20
+[server] engine log: /home/pgx/.cache/basalt/aefd5d98dc650ed4/engine.log
+[server] ready    http://127.0.0.1:30001/v1  openai+anthropic  stats http://127.0.0.1:30001/
+[server] network  http://192.168.1.241:30001/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=15.9GB pool-affinity=auto pool=14
+[server] loading model weights [============>           ]  35.8/68.4 GiB  3046 MB/s
+[server] warning: the device-planned MoE tail is off: every expert is resident
+[server] loaded   68.4GiB 30.1s
+[server] kv       0.9/7.8GiB cuda0 elastic slots=2
+[server] slots    par=2 ctx/slot=262144, others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] thinking budget 16 tokens, output cap 32 (answer-room auto)
+[server] thinking budget 16 tokens, output cap 32 (answer-room auto)
+[server] s1 read  pp=10640/88957 2044t/s 5s
+[server] s2 read  pp=21280/88957 2130t/s 10s
+[server] s1 read  pp=22800/88957 2134t/s 11s
+[server] s1 read  pp=33946/88957 2151t/s 16s
+[server] s2 read  pp=43066/88957 2157t/s 20s
+[server] s1 read  pp=46106/88957 2162t/s 21s
+[server] s1 read  pp=56746/88957 2141t/s 27s
+[server] s2 read  pp=63333/88957 2141t/s 30s
+[server] s1 read  pp=67386/88957 2137t/s 32s
+[server] s1 read  pp=78290/88957 2108t/s 37s
+[server] s2 read  pp=83621/88957 2097t/s 40s
+[server] s1 read  pp=88952/88957 2082t/s 43s
+[server] s2 read  pp=76958/88957 1874t/s 45s
+[server] s2 read  pp=87619/88957 1917t/s 51s
+[server] live | s1 tg=6/32 0.7t/s | total 1t/s
+[server] thinking budget reached (16 tokens), wrapping up
+[server] thinking budget reached (16 tokens), wrapping up
+[server] s1 done  pp=88957/0c 0.2s 360734t/s  tg=32 16.4t/s acc=50% dl=2.1  ttft=42.9s  end=length
+[server] s2 done  pp=88957/72960c 0.4s 44822t/s  tg=32 32.2t/s acc=64% dl=1.8  ttft=51.9s  end=length
+[server] stopping (Ctrl+C again to force)
+[server] stopped

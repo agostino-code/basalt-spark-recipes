@@ -157,7 +157,12 @@ launcher per model — `start-hy4.sh` (four slots × 262,144, `:30000`) and `sta
 ```bash
 ./run.sh qwen               # four slots x 262144 on :30001
 ./run.sh qwen --port 30102  # another port, same model
+./run.sh --preset qwen-2    # two full windows - the largest clean configuration
+./run.sh --preset qwen-single
 ```
+
+The named presets are in [presets/](../presets/); `qwen-agent` is the four-slot baseline above and
+`qwen-2` the shape the two-window measurement used.
 
 ### Requirements
 

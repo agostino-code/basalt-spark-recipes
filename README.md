@@ -29,7 +29,9 @@ not tested*; both appendices are that validation for their pack.
 * [README.md](README.md) — this document: the unified install, the two lanes, the numbers and the traps.
 * [LICENSE](LICENSE) — MIT for the text and scripts in this repository.
 * [install-basalt.sh](install-basalt.sh) — one installer for both lanes: `--model hy4|qwen|all`.
-* [run.sh](run.sh) — `./run.sh [hy4|qwen] [server args]`, starts a lane from `basalt-port/`.
+* [run.sh](run.sh) — `./run.sh [--preset NAME|hy4|qwen] [server args]`, starts a lane from `basalt-port/`.
+* [presets/](presets/) — the named launch configurations: agent, fp8, two-slot, vision, single
+  window; `./run.sh --list-presets` lists them.
 * [patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch) — the shared sm_121
   patch: NVFP4 on the tiled MMQ path, the expert ring off, product names in the MMQ launch errors.
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
@@ -41,8 +43,9 @@ not tested*; both appendices are that validation for their pack.
   * [tools/qwen-lane-check.py](tools/qwen-lane-check.py) — the Qwen acceptance check (R1/R2/R3, then a fault scan of the log).
 * [evidence/](evidence/) — the raw logs: the Qwen lane (`lane.log`, `smoke.log`, `basalt-bench.log`,
   `quality.log`, `bench-random-body.log`, `lane-quiet.log`), and the Hy4 lane after the Engram fix
-  (`hy4-quality-f9bf55aa.log`, `hy4-smoke-f9bf55aa.log`), plus the one RAM-tier fault seen before
-  dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
+  (`hy4-quality-f9bf55aa.log`, `hy4-quality-fp8.log`, `hy4-smoke-f9bf55aa.log`), the preset smoke
+  (`presets-smoke.log`), the two-slot Qwen run (`qwen-two-slots-89k.log`), plus the one RAM-tier
+  fault seen before dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
@@ -127,6 +130,28 @@ basalt-port/start-qwen.sh                 # four slots x 262,144, int8 KV, port 
 systemctl --user start hy4-basalt         # if installed with --install-unit
 systemctl --user start qwen-basalt
 ```
+
+Presets are named flag sets for those same start scripts ([presets/](presets/), format in
+[presets/README.md](presets/README.md)):
+
+```bash
+./run.sh --list-presets
+./run.sh --preset hy4-fp8                 # Hy4 with fp8 KV
+./run.sh --preset qwen-2 --port 30100     # Qwen, two full windows, another port
+```
+
+| Preset | Lane | Shape |
+|---|---|---|
+| `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV — the measured baseline |
+| `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV — half the KV, the difference in expert slots |
+| `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV — lower memory |
+| `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` |
+| `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
+| `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |
+| `qwen-single` | Qwen | 1 slot × 262,144, int8 KV |
+
+`hy4-fp8` halves the KV for +0.004 KLD and no top-1 loss; every preset's tested numbers are in
+[presets/README.md#measured](presets/README.md#measured).
 
 `basalt-port/` is a working checkout, not a vendored copy: it is gitignored and never committed. Its
 `build/`, `.venv/` and `models/` are exactly what the two lanes share — one engine tree serves both

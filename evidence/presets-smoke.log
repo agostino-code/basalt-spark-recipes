@@ -1,0 +1,7 @@
+hy4-agent PASS http=200 | [server] hy4-flash  ctx=262144 (1048576/4 slots) batch=4 spec=6 temp=0.9 top_p=1.0 | answer: The preset test is running.
+hy4-fp8 PASS http=200 | [server] hy4-flash  ctx=262144 (1048576/4 slots) kv=fp8 batch=4 spec=6 temp=0.9 top_p=1.0 | answer: The preset test is running.
+hy4-2 PASS http=200 | [server] hy4-flash  ctx=262144 (524288/2 slots) batch=2 spec=6 temp=0.9 top_p=1.0 | answer: The preset test is running.
+hy4-vision PASS http=200 | [server] hy4-flash  ctx=262144 spec=6 temp=0.9 top_p=1.0 vision=gpu0 | answer: The preset test is running.
+qwen-agent PASS http=200 | [server] qwen3.8-flash-next  ctx=262144 (1048576/4 slots) kv=int8 batch=4 spec=8 temp=1.0 top_p=0.95 top_k=20 | answer: The preset test is running.
+qwen-2 PASS http=200 | [server] qwen3.8-flash-next  kv=int8 ctx=262144 (524288/2 slots) batch=2 spec=8 temp=1.0 top_p=0.95 top_k=20 | answer: The preset test is running.
+qwen-single PASS http=200 | [server] qwen3.8-flash-next  kv=int8 ctx=262144 spec=8 temp=1.0 top_p=0.95 top_k=20 | answer: The preset test is running.
