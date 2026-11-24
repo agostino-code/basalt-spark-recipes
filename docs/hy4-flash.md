@@ -305,6 +305,12 @@ per-layer staging costs nothing measurable here, so this is a workaround with no
   `expert 376 of layer 2 is not in RAM`. Dropping the base's cache too brought the plan back to
   512 of 512 experts on the card, where three sequential requests ran. The lane's start script drops
   only the pack, not a base file downloaded for measurement.
+* **More than 262,144 tokens per slot is not stable.** The engine accepts
+  `--parallel 2 --max-context 1048576` (2 × 524,288) and a single 1,048,576 slot, and a 16k prompt
+  runs; an 80,031-token prompt then died in `prefill mmq: quantize(gemm)` (an illegal memory access)
+  on both, while the same prompt on 4 × 262,144 passed. Tiling the Q8_0 MMQ rows, the sibling of the
+  NVFP4 workaround, did not change it. So the model's 1M context is not reachable through this lane
+  yet: 262,144 per slot is the tested maximum, and the long-window presets were withdrawn.
 * **compute-sanitizer is not usable at this model size.** `memcheck` needs shadow memory; with an
   86 GiB model resident, the engine aborts loading (`RAM ran out loading (839 MiB free)`) and the
   expert tier shrinks to 11 of 512 experts — which changes the state and hides the bug. Use targeted
