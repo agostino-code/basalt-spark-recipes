@@ -111,10 +111,13 @@ fp4 1536: OK, finite=1, out[0]=1.04887
 ```
 
 (`evidence/fp4-1536-microtest.log`). The kernel/tile geometry is therefore **not** the blocker; the
-Hy4 prototype's misalignment is in the **real-mode plumbing** — the real blob layout/stride, the
-`lay` offsets, or the buffer sizes — to be isolated by logging the real `lay.bytes`, `lay.down_off`,
-`stride_` and blob pointers and comparing them with the synthetic geometry. The 1536 quantizer and
-product support are in place; the remaining work is plumbing, not a new tensor-core kernel.
+Hy4 prototype's misalignment is in the **real-mode plumbing**. The real geometry was logged
+(`evidence/fp4-1536-real-geometry.log`): `lay.bytes` 3,981,328, `up_off` 1,327,104, `down_off`
+2,654,208, `gu_row`/`d_row` 864, `stride_` 3,981,456 (`bytes` + 128); all the activation/H/blob pointers
+are 16- or 128-byte aligned. Those match the synthetic layout, and the micro-test with two experts
+passes. The remaining difference is the real stage shape — up to 16 experts and ~23k rows per launch
+(the micro used 2 experts / 16 rows) — so the next test is the same micro at 16 experts and ~17k
+rows: that isolates the multi-segment H-plane/down-product layout from the gross pointers.
 
 **Qwen already has this**: its prompt path uses `expert_fp4.cpp`/`run_group` at 2304/2560/640, and the
 `prefill_fp4_test` above is its parity test. Nothing has to be implemented for Qwen; it is the reference
