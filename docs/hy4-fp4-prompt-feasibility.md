@@ -217,3 +217,19 @@ avoided) runs at 33k, but its quality is also broken: **KLD 1.67103, top-1 62.98
 layout itself, not the token GATHER alone: the plane two-term down is non-zero but wrong, and both
 token and pair-row gates diverge. Quality parity needs a real 1536 two-term kernel fix. The one-term
 path is the only correct one.
+
+
+## Validation (one-term)
+
+The other tests confirm the one-term prototype and discount the exact-SwiGLU variant:
+
+| Test | Result |
+|---|---|
+| pair-row one-term + Hy4 `swiglu_split_clamped` | quality **17.1022 PPL / 0.22626 KLD / 85.65 % top-1**, 31.6 s at 33k; no quality gain over the token one-term and 2.6 s slower |
+| 620k, one slot, 1M context, 8k chunks | **624,832 tokens, 1222.7 s, 511 tok/s**, no fault (`evidence/hy4-fp4-620k.log`) |
+| MMQ 620k baseline | 624,830 tokens, 1325.4 s, 471 tok/s |
+
+So the one-term token path is the validated prototype: **+21 % at 33k, +12 % at 222k, +7.7 % at
+620k**, with quality **0.22542 KLD / 85.40 % top-1** against MMQ 0.20460 / 86.22 %. The exact-SwiGLU
+pair-row variant gives no quality improvement (0.22626) and is slower; the fused token path stays. The
+two-term 1536 kernel remains the only route to parity and is still broken.

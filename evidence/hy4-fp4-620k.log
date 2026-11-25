@@ -1,0 +1,137 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=1048576 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30005/v1  openai+anthropic  stats http://127.0.0.1:30005/
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=14
+[server] ram      floor 2.0 GiB of 105.1 GiB free
+[server] placed   ram 0.4GiB 0.8s
+[server] loading model weights [===========>            ]  41.9/85.5 GiB  2737 MB/s
+[server] placed   cuda0 85.2GiB 32.5s
+[server] loaded   85.5GiB 32.8s  cuda0=85.1GiB ram=0.4GiB
+[server] weights  loaded, ctx=1048576 images=off
+[server] s1 done  pp=22/0c 0.4s  tg=1 14.4t/s  ttft=0.5s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] s1 read  pp=8192/624832 878t/s 9s
+[server] s1 read  pp=16384/624832 903t/s 18s
+[server] s1 read  pp=24576/624832 911t/s 27s
+[server] s1 read  pp=32768/624832 913t/s 36s
+[server] s1 read  pp=40960/624832 914t/s 45s
+[server] s1 read  pp=49152/624832 914t/s 54s
+[server] s1 read  pp=57344/624832 912t/s 63s
+[server] s1 read  pp=65536/624832 911t/s 72s
+[server] s1 read  pp=73728/624832 910t/s 81s
+[server] s1 read  pp=81920/624832 907t/s 90s
+[server] s1 read  pp=90112/624832 905t/s 100s
+[server] s1 read  pp=98304/624832 903t/s 109s
+[server] s1 read  pp=106496/624832 901t/s 118s
+[server] s1 read  pp=114688/624832 898t/s 128s
+[server] s1 read  pp=122880/624832 896t/s 137s
+[server] s1 read  pp=131072/624832 893t/s 147s
+[server] s1 read  pp=139264/624832 890t/s 157s
+[server] s1 read  pp=147456/624832 887t/s 166s
+[server] s1 read  pp=155648/624832 884t/s 176s
+[server] s1 read  pp=163840/624832 882t/s 186s
+[server] s1 read  pp=172032/624832 879t/s 196s
+[server] s1 read  pp=180224/624832 876t/s 206s
+[server] s1 read  pp=180224/624832 876t/s 216s
+[server] s1 read  pp=188416/624832 874t/s 226s
+[server] s1 read  pp=196608/624832 871t/s 236s
+[server] s1 read  pp=204800/624832 868t/s 246s
+[server] s1 read  pp=212992/624832 865t/s 256s
+[server] s1 read  pp=221184/624832 863t/s 266s
+[server] s1 read  pp=229376/624832 860t/s 277s
+[server] s1 read  pp=237568/624832 857t/s 287s
+[server] s1 read  pp=245760/624832 854t/s 298s
+[server] s1 read  pp=253952/624832 852t/s 308s
+[server] s1 read  pp=262144/624832 849t/s 319s
+[server] s1 read  pp=270336/624832 846t/s 330s
+[server] s1 read  pp=278528/624832 843t/s 340s
+[server] s1 read  pp=286720/624832 840t/s 351s
+[server] s1 read  pp=294912/624832 838t/s 362s
+[server] s1 read  pp=303104/624832 835t/s 373s
+[server] s1 read  pp=311296/624832 832t/s 384s
+[server] s1 read  pp=319488/624832 829t/s 396s
+[server] s1 read  pp=327680/624832 826t/s 407s
+[server] s1 read  pp=335872/624832 823t/s 418s
+[server] s1 read  pp=344064/624832 820t/s 430s
+[server] s1 read  pp=352256/624832 817t/s 441s
+[server] s1 read  pp=360448/624832 814t/s 453s
+[server] s1 read  pp=368640/624832 811t/s 465s
+[server] s1 read  pp=376832/624832 807t/s 477s
+[server] s1 read  pp=385024/624832 804t/s 489s
+[server] s1 read  pp=393216/624832 800t/s 502s
+[server] s1 read  pp=401408/624832 795t/s 515s
+[server] s1 read  pp=409600/624832 790t/s 529s
+[server] s1 read  pp=417792/624832 784t/s 543s
+[server] s1 read  pp=425984/624832 778t/s 548s
+[server] s1 read  pp=425984/624832 778t/s 558s
+[server] s1 read  pp=434176/624832 770t/s 564s
+[server] s1 read  pp=434176/624832 770t/s 574s
+[server] s1 read  pp=442368/624832 761t/s 582s
+[server] s1 read  pp=442368/624832 761t/s 592s
+[server] s1 read  pp=450560/624832 751t/s 600s
+[server] s1 read  pp=450560/624832 751t/s 610s
+[server] s1 read  pp=450560/624832 751t/s 620s
+[server] s1 read  pp=458752/624832 739t/s 631s
+[server] s1 read  pp=458752/624832 739t/s 641s
+[server] s1 read  pp=466944/624832 726t/s 653s
+[server] s1 read  pp=466944/624832 726t/s 663s
+[server] s1 read  pp=475136/624832 713t/s 676s
+[server] s1 read  pp=475136/624832 713t/s 686s
+[server] s1 read  pp=483328/624832 699t/s 701s
+[server] s1 read  pp=483328/624832 699t/s 711s
+[server] s1 read  pp=491520/624832 685t/s 717s
+[server] s1 read  pp=491520/624832 685t/s 727s
+[server] s1 read  pp=491520/624832 685t/s 737s
+[server] s1 read  pp=499712/624832 672t/s 744s
+[server] s1 read  pp=499712/624832 672t/s 754s
+[server] s1 read  pp=499712/624832 672t/s 764s
+[server] s1 read  pp=507904/624832 658t/s 772s
+[server] s1 read  pp=507904/624832 658t/s 782s
+[server] s1 read  pp=507904/624832 658t/s 792s
+[server] s1 read  pp=516096/624832 645t/s 800s
+[server] s1 read  pp=516096/624832 645t/s 810s
+[server] s1 read  pp=516096/624832 645t/s 820s
+[server] s1 read  pp=524288/624832 633t/s 829s
+[server] s1 read  pp=524288/624832 633t/s 839s
+[server] s1 read  pp=524288/624832 633t/s 849s
+[server] s1 read  pp=532480/624832 620t/s 858s
+[server] s1 read  pp=532480/624832 620t/s 868s
+[server] s1 read  pp=532480/624832 620t/s 878s
+[server] s1 read  pp=532480/624832 620t/s 888s
+[server] s1 read  pp=540672/624832 609t/s 898s
+[server] s1 read  pp=540672/624832 609t/s 908s
+[server] s1 read  pp=540672/624832 609t/s 918s
+[server] s1 read  pp=548864/624832 597t/s 929s
+[server] s1 read  pp=548864/624832 597t/s 939s
+[server] s1 read  pp=548864/624832 597t/s 949s
+[server] s1 read  pp=557056/624832 586t/s 961s
+[server] s1 read  pp=557056/624832 586t/s 971s
+[server] s1 read  pp=557056/624832 586t/s 981s
+[server] s1 read  pp=565248/624832 576t/s 992s
+[server] s1 read  pp=565248/624832 576t/s 1002s
+[server] s1 read  pp=565248/624832 576t/s 1012s
+[server] s1 read  pp=573440/624832 566t/s 1024s
+[server] s1 read  pp=573440/624832 566t/s 1034s
+[server] s1 read  pp=573440/624832 566t/s 1044s
+[server] s1 read  pp=581632/624832 556t/s 1056s
+[server] s1 read  pp=581632/624832 556t/s 1066s
+[server] s1 read  pp=581632/624832 556t/s 1076s
+[server] s1 read  pp=589824/624832 547t/s 1089s
+[server] s1 read  pp=589824/624832 547t/s 1099s
+[server] s1 read  pp=589824/624832 547t/s 1109s
+[server] s1 read  pp=598016/624832 538t/s 1122s
+[server] s1 read  pp=598016/624832 538t/s 1132s
+[server] s1 read  pp=598016/624832 538t/s 1142s
+[server] s1 read  pp=606208/624832 530t/s 1155s
+[server] s1 read  pp=606208/624832 530t/s 1165s
+[server] s1 read  pp=606208/624832 530t/s 1175s
+[server] s1 read  pp=614400/624832 521t/s 1188s
+[server] s1 read  pp=614400/624832 521t/s 1198s
+[server] s1 read  pp=614400/624832 521t/s 1208s
+[server] s1 read  pp=622592/624832 514t/s 1222s
+[server] s1 done  pp=624832/0c 1222.7s 511t/s  tg=1 15.6t/s  ttft=1222.8s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] stopping (Ctrl+C again to force)
+[server] stopped
