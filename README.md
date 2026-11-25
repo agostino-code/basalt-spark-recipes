@@ -37,10 +37,11 @@ not tested*; both appendices are that validation for their pack.
 * [patches/0002-qwen-fp16-batch.patch](patches/0002-qwen-fp16-batch.patch) — Qwen's batch windows
   with FP16 K/V: the segment K/V append stores the resident FP16 pools, so `--parallel` 2–4 works
   with `--kv fp16` (streamed FP16 is refused).
-* [patches/0003-hy4-large-slot-chunks.patch](patches/0003-hy4-large-slot-chunks.patch) — a per-slot
-  context above 262,144 uses 8,192-row prompt chunks: the ~15k-row NVFP4 `moe-down` launch faults on
-  sm_121. Two 524,288-token windows and a single 1,048,576 one pass at 80k/200k prompts; the
-  4 × 262,144 lane keeps its measured 16,384-row chunks.
+* [patches/0003-hy4-chunk-policy.patch](patches/0003-hy4-chunk-policy.patch) — the prompt-chunk policy.
+  A per-slot context above 262,144 uses 8,192-row chunks (the ~15k-row NVFP4 `moe-down` launch faults
+  on sm_121); prompts up to 131,072 tokens use 32,768 rows (33k prefill 32.4 s against 36.1 s, 80k in
+  78.8 s), and longer prompts keep 16,384 (the measured long-context numbers). About 2.5 GiB more
+  workspace, all experts resident.
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
   concurrency ladder and the Qwen acceptance check:
   * [tools/basalt-repro.py](tools/basalt-repro.py) — deterministic Hy4 crash reproduction (`crash`, `ladder`, `pair`).
@@ -55,8 +56,9 @@ not tested*; both appendices are that validation for their pack.
   (`qwen-fp16-batch-single.log`, `-pair.log`, `-quad.log`, `-full4.log`), the int8 regression and the
   resident refusal (`qwen-batch-int8-regression.log`, `qwen-fp16-resident-refused.log`), the batch
   logprob comparison (`qwen-batch-logprobs.log`), the pre-patch fp16 refusal (`qwen-fp16-batch-refused.log`),
-  the long Hy4 windows after 0003 (`hy4-long-2x524.log`, `hy4-long-1m.log`), plus the one RAM-tier
-  fault seen before dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
+  the long Hy4 windows after 0003 (`hy4-long-2x524.log`, `hy4-long-1m.log`), the 33k/80k prefill
+  after 0003 (`hy4-prefill-33k.log`, `hy4-prefill-80k.log`), plus the one RAM-tier fault seen before
+  dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
@@ -260,14 +262,15 @@ the variance is the batch path's, not the new FP16 store. Use one slot when exac
 matters. Four full FP16 windows spend 30.4 GiB of KV and push ~30 GB of experts to RAM, so int8 stays
 the default shape.
 
-[patches/0003-hy4-large-slot-chunks.patch](patches/0003-hy4-large-slot-chunks.patch) makes a per-slot
-context above 262,144 usable. A ~15k-row prompt chunk faults in the NVFP4 `moe-down` launch on sm_121
-(`prefill mmq: moe-down` with `CUDA_LAUNCH_BLOCKING=1`; the unblocked tag is the sticky
-`quantize(gemm)`); two 524,288-token slots or one 1,048,576 slot died on an 80,031-token prompt while
-4 × 262,144 passed the same prompt. Tiling the Q8_0 rows and an 8 MiB staging guard did not change it.
-The patch caps the prompt chunk at 8,192 rows only when the per-slot context is above 262,144: the
-80k and 200k prompts then pass on 2 × 524,288 (140 s and 267 s) and 80k on one 1,048,576 slot (139 s).
-The root cause is still open, and a full 524k/1M prompt is not measured.
+[patches/0003-hy4-chunk-policy.patch](patches/0003-hy4-chunk-policy.patch) is the prompt-chunk policy,
+with two ends. A per-slot context above 262,144 uses 8,192-row chunks: a ~15k-row chunk faults in the
+NVFP4 `moe-down` launch on sm_121 (`prefill mmq: moe-down` with `CUDA_LAUNCH_BLOCKING=1`; the
+unblocked tag is the sticky `quantize(gemm)`), and two 524,288-token slots or one 1,048,576 slot died
+on an 80,031-token prompt while 4 × 262,144 passed. The 80k and 200k prompts then pass on two such
+slots (140 s and 267 s) and 80k on one (139 s); the root cause is still open. At the other end,
+32,768-row chunks at up to 131,072 tokens cut the 33k prefill from 36.1 s to 32.4 s (~10%) and read
+80k in 78.8 s; longer prompts keep 16,384 rows, since attention inside a chunk is the cost there. The
+workspace grows by ~2.5 GiB; the lane still keeps every expert resident.
 
 None of the patches is upstreamed; this repository offers them as files.
 

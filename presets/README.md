@@ -46,6 +46,7 @@ cost:
 | `qwen` batch numerics | the slots are not bitwise against a one-slot window: the same greedy prompt moves a row's logits by ~0.1 nats and a near-tie token can flip. The unchanged int8 batch does the same, so it is the 0.5.0 batch path, not the FP16 store; one slot for exact reproduction. |
 | `qwen` int8 regression | the unchanged int8 batch path with two slots still answers. |
 | `hy4-2x524` / `hy4-1m` (patch 0003) | an 80k-token prompt passes on both (2 × 524,288: 200, 140 s; 1 × 1,048,576: 200, 139 s); 2 × 524,288 also passes 200k tokens (200, 267 s). A full 524k/1M prompt is not measured. |
+| Hy4 prefill (patch 0003) | 33k tokens in 32.4 s against 36.1 s with 16k chunks (~10%), 80k in 78.8 s; the 16k depth is unchanged and prompts above 128k keep 16,384-row chunks. |
 | `qwen` fp16 + `--kv-resident` | refused at the batch init: `a batch window's FP16 K/V must be resident (drop --kv-resident)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
 

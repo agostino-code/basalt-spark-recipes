@@ -36,7 +36,7 @@ index d07e2b2c..f273cf72 100644
  #include <memory>
  #include <set>
  #include <utility>
-@@ -61,6 +62,13 @@ namespace {
+@@ -61,4 +62,11 @@ namespace {
  
  namespace bk = basalt::kernels;
  
@@ -48,8 +48,6 @@ index d07e2b2c..f273cf72 100644
 +}
 +
  constexpr int kRowWidth = 576;                 // a cache row: 512 latent values and 64 rotated
- constexpr int kMaxChunk = 16384;               // rows a prompt chunk may carry (the residual streams and the experts' pairs)
- constexpr int kAttRows = 2048;                 // rows of one attention step inside a chunk (the rings are sized for it)
 @@ -362,9 +370,36 @@ public:
      // turn's new messages) keeps the card's expert slots, which its experts are staged from card to card, and makes its buffers
      // beside them: first in what the tier left free, then in the slots beside the base arena (shrink: the base keeps its

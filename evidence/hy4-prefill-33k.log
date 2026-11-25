@@ -1,0 +1,21 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=262144 (1048576/4 slots) batch=4 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30000/v1  openai+anthropic  stats http://127.0.0.1:30000/
+[server] network  http://192.168.1.241:30000/v1
+[server] warning  no api key, open to the network (--api-key KEY)
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=19
+[server] ram      floor 2.0 GiB of 98.2 GiB free
+[server] loading model weights [===========>            ]  40.4/86.2 GiB  2903 MB/s
+[server] loaded   86.2GiB 33.6s
+[server] slots    par=4 ctx/slot=262144, others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] s1 read  pp=29363 10s
+[server] s1 read  pp=29363 20s
+[server] s1 read  pp=29363 30s
+[server] s1 read  pp=29362/29363 807t/s 36s
+[server] s1 done  pp=29363/0c 36.6s 802t/s  tg=16 32.9t/s acc=86% dl=3.2  ttft=36.7s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] stopping (Ctrl+C again to force)
+[server] stopped

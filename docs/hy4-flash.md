@@ -36,6 +36,11 @@ faults and that the other one does not, not which instruction does it (see
 | KV ceiling (4 slots) | `elastic KV: about 262144 cells fit in the 4 sessions (1048576 at full context)` |
 | Stability | **0 engine faults** across both benchmark runs (≈500 requests, peak request 128k tokens) |
 
+Patch 0003 raises the prompt chunk to 32,768 rows while the prompt is at most 131,072 tokens: the
+33k prefill reads 32.4 s against 36.1 s with 16,384-row chunks (~10%), and 80k reads in 78.8 s; the
+16k depth is unchanged, above 128k the chunk stays 16,384 (the long-context numbers above) and above
+262,144 per slot it stays 8,192 (the large-slot cap above). The workspace grows by ~2.5 GiB; every expert stays resident.
+
 Benchmark results, both on the public leaderboards:
 
 * **opencode-bench-plusplus, suite `locker-v5`, variant `default`** — quality **0.9881**, wall
@@ -115,7 +120,7 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 160 GiB free for the pack | seconds |
 | 2 | clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aa`**, the commit we validated, into `basalt-port/` | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — the pinned commit carries 0001 (NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors); 0002 is Qwen-only, 0003 caps the prompt chunk for per-slot contexts above 262,144 | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — the pinned commit carries 0001 (NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors); 0002 is Qwen-only, 0003 is the prompt-chunk policy (8k above 262,144 per slot, 32k up to 128k-token prompts, 16k above) | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Hy4-flash-Basalt](https://huggingface.co/jesdga/Hy4-flash-Basalt) into `models/`, resumable and size-checked | 1–3 h |
@@ -313,7 +318,7 @@ per-layer staging costs nothing measurable here, so this is a workaround with no
   is the sticky one. Neither tiling the Q8_0 MMQ rows nor an 8 MiB guard after the staging buffers
   changed it. **Patch 0003** caps the prompt chunk at 8,192 rows when the per-slot context is above
   262,144: 80k and 200k prompts then pass on 2 × 524,288 (140 s and 267 s), and 80k on one 1,048,576
-  slot (139 s); the 4 × 262,144 lane keeps 16,384-row chunks and its measured prefill. The root cause
+  slot (139 s); the 4 × 262,144 lane does not fault, and the same patch raises its chunk to 32k up to 128k. The root cause
   (the tiled NVFP4 `moe-down` launch at ~15k rows) is still open, and a full 524k/1M prompt is not
   measured.
 * **compute-sanitizer is not usable at this model size.** `memcheck` needs shadow memory; with an
