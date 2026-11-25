@@ -81,9 +81,12 @@ target. The full kernel tables are in [evidence/hy4-prefill-kernels.txt](../evid
 
 Two cheap dense-path knobs were tried and rejected: 4,096-row attention steps (the doubled buffers
 ran the lane into RAM/checkpoint failures) and tiling the Q8_0 MMQ rows (about 20% slower than the
-stream-k rows at 33k). The dense path's next real steps are fusing the activation quantizer into the
-MMQ (the quantizer is ~10% on its own) or moving the prompt experts to FP4 tensor cores (19% plus a
-share of the quantizer).
+stream-k rows at 33k). A per-step cache of the q8_1 `xn_` shared by q_a, kv_a, gate and indexer.k was
+also tried: the quantizer kernel fell from 4.40 s to 4.13 s at 33k (0.27 s of ~36 s), under 1%
+end-to-end, so it was not shipped. Fusing the quantizer into the MMQ itself is the only larger
+quantizer win, and it would need the q8_1 blocks shared across the n tiles — a kernel redesign. The
+dense path's next real step is moving the prompt experts to FP4 tensor cores (19% plus a share of the
+quantizer).
 
 ### Quality against the BF16 reference
 
