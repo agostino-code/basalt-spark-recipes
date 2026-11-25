@@ -101,13 +101,20 @@ basalt: error: prefill fp4: 1536 token columns (two terms)
 
 (`evidence/fp4-hy4-1536-error.log`). I then added the 1536 quantize dispatches (`quantize_kernel<3>`
 for tokens/planes/f16); they compile, but the next step, the FP4 **gemm**, faults with
-`prefill fp4: gemm: misaligned address` (`evidence/fp4-hy4-1536-gemm-error.log`). It still faults with
-one-term activations and one-term H (`evidence/fp4-hy4-1536-gemm-oneterm.log`), so the product/tile
-geometry — not the two-term quantizer — is the blocker. A Hy4 FP4 path therefore needs
-**new kernel/tile work for 1536** — the token-plane quantizer, the activation-plane quantizer, and the
-product/tile geometry — not just plumbing. The earlier 1.5–2 week estimate was optimistic; the kernel
-support is the bulk of the work (closer to 3–5 weeks), and it should start with a 1536 micro-benchmark
-before any MoE integration.
+`prefill fp4: gemm: misaligned address` (`evidence/fp4-hy4-1536-gemm-error.log`), also with one-term
+activations and one-term H (`evidence/fp4-hy4-1536-gemm-oneterm.log`). **But the 1536 product itself
+works**: the micro-test `tools/fp4-1536-test.cpp` (one and two experts at the exact 1536×1536 geometry,
+one-term token planes and H, real `fp4::Product`/`quantize` sequence) prints
+
+```
+fp4 1536: OK, finite=1, out[0]=1.04887
+```
+
+(`evidence/fp4-1536-microtest.log`). The kernel/tile geometry is therefore **not** the blocker; the
+Hy4 prototype's misalignment is in the **real-mode plumbing** — the real blob layout/stride, the
+`lay` offsets, or the buffer sizes — to be isolated by logging the real `lay.bytes`, `lay.down_off`,
+`stride_` and blob pointers and comparing them with the synthetic geometry. The 1536 quantizer and
+product support are in place; the remaining work is plumbing, not a new tensor-core kernel.
 
 **Qwen already has this**: its prompt path uses `expert_fp4.cpp`/`run_group` at 2304/2560/640, and the
 `prefill_fp4_test` above is its parity test. Nothing has to be implemented for Qwen; it is the reference
