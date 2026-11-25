@@ -21,10 +21,13 @@ to the tree this unified installer builds. This README is the shared install and
 > [`agostino-code/basalt`](https://github.com/agostino-code/basalt), a direct fork of the official
 > `jesdga95/basalt`, at main `c70e8011` (0.5.7 + the DGX Spark / Arm64 support that used to live in
 > the third-party port). The 0.5.0-specific sm_121 patch is gone: main has the platform support. Only
-> two patches remain — 0001 Qwen FP16 batch windows, 0002 Hy4 prompt-chunk policy. The numbers and
-> preset notes below were measured on the 0.5.0 tree and are being re-characterised on 0.5.7; the
-> upstream PRs are [#694](https://github.com/jesdga95/basalt/pull/694) (Qwen FP16) and
-> [#695](https://github.com/jesdga95/basalt/pull/695) (chunk policy).
+> two patches remain — 0001 Qwen FP16 batch windows, 0002 Hy4 prompt-chunk policy. The 0.5.7 base
+> was validated on the GB10: 33k **31,4 s**, 71k **77,5 s**, 222k **270 s** (0.5.0: 32,4 / 78,8 /
+> 292), the 100-chunk gate **17,6184 PPL / 0,20460 KLD / 86,22 % top-1**, all 12 presets and both
+> installer smokes pass, and a **624.830-token prompt** completes in 1325 s with no illegal access
+> (the 8k cap). The 0.5.0 tables in the appendices remain the historical record. Upstream:
+> [#694](https://github.com/jesdga95/basalt/pull/694) and
+> [#695](https://github.com/jesdga95/basalt/pull/695).
 
 What is ours is small: the fork, the two patches, the lane configuration and the measurements. The
 engine, the port, the packs and the models are other people's work — see [Credits](#credits). The

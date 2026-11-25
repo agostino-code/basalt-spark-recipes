@@ -1,0 +1,24 @@
+basalt-bench: starting the engine for the quality gate
+basalt-bench: loading 85.5 GiB
+basalt-bench: loading 24.4 / 85.5 GiB (28%)
+basalt-bench: loading 51.4 / 85.5 GiB (60%)
+basalt-bench: loading 78.3 / 85.5 GiB (91%)
+basalt-bench: loading weights 85.5 / 85.5 GiB done (33 s)
+basalt-bench: engine ready in 37 s
+  quality 10/100 chunks, 155 s
+  quality 20/100 chunks, 312 s
+  quality 30/100 chunks, 467 s
+  quality 40/100 chunks, 623 s
+  quality 50/100 chunks, 779 s
+  quality 60/100 chunks, 934 s
+  quality 70/100 chunks, 1090 s
+  quality 80/100 chunks, 1245 s
+  quality 90/100 chunks, 1401 s
+  quality 100/100 chunks, 1556 s
+basalt-bench: warning: the power limit could not be read; pass --power-label W
+
+quality gate: 100 chunks asked, T=1
+chunks 100  rows 25500
+PPL 17.6184 +/- 0.4480   base PPL 18.4162   ln(PPL/base) -0.04429
+KLD mean 0.20460  median 0.02994  p99 3.2260  max 23.0857
+same top-1 86.22%   mean |dlogp| of the base top-1 0.28651

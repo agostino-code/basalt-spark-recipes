@@ -120,6 +120,32 @@ The GB10 lane reproduces the fixed engine's quality: KLD and top-1 are where 0.5
 where the pre-fix engine does. Our run is the engine's auto placement (512 of 512 experts on the
 card); upstream's 5090 number pins `--expert-cache 4800`. The 0.9881 opencode-bench row above is
 **not** a post-fix number — it was measured on `8172978` — and the fix changes Hy4 output, so the
+
+### Validation on 0.5.7 main + the two patches
+
+The installer now builds `agostino-code/basalt` main `c70e8011` with patches 0001 (Qwen FP16) and
+0002 (chunk policy). Measured on the same GB10:
+
+| Prompt | 0.5.0 tag | 0.5.7 main + patches |
+|---|---:|---:|
+| 33k | 32.4 s | **31.4 s** |
+| 71,142 | 78.8 s | **77.5 s** (86.7 s server) |
+| 222,253 | 292 s | **270 s** (823 tok/s) |
+
+The 100-chunk quality gate on 0.5.7: **PPL 17.6184 ± 0.4480**, **KLD 0.20460**, same top-1
+**86.22 %** against the same 18.4162 base — the 0.5.0 numbers are 17.5207 / 0.20300 / 86.32 %, so the
+engine is the same within the run's variance and the gate is faster (1556 s against 1773 s).
+
+The 0.5.7 notes list an illegal access on prompts around 600K and more. With the 8k cap of 0002 a
+**624,830-token prompt on one 1,048,576 slot completed in 1325.4 s (471 tok/s) without a fault**
+(ring copies 255.7 s); the 555k case had already passed at 1167 s. The >600K fault is therefore
+covered by the chunk policy, not by a new kernel patch.
+
+All 12 presets start and answer on this base (one short request each), the installer's own Hy4 and
+Qwen smoke tests pass, and Qwen's 2 × 262,144 / 4 × 131,072 FP16 windows and the int8 4-slot
+regression all answer. The preset matrix needs a process-group cleanup between runs: a `kill -TERM`
+on the `run.sh` pid alone leaves the engine holding the GPU, which is a harness detail, not a
+0.5.7 behaviour.
 gate above is the figure to compare across the fix.
 
 With `--kv fp8` (the `hy4-fp8` preset) the same gate reads PPL 17.6522 ± 0.4489, KLD 0.20744,

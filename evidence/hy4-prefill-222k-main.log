@@ -1,0 +1,47 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=262144 (1048576/4 slots) batch=4 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30004/v1  openai+anthropic  stats http://127.0.0.1:30004/
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=14
+[server] ram      floor 2.0 GiB of 103.1 GiB free
+[server] placed   ram 0.4GiB 0.8s
+[server] loading model weights [===========>            ]  41.3/85.5 GiB  3023 MB/s
+[server] placed   cuda0 85.2GiB 32.4s
+[server] loaded   85.5GiB 33.0s  cuda0=85.1GiB ram=0.4GiB
+[server] slots    slots 4 × 262144 ctx (slot-full-context: 1048576 each), others queue
+[server] weights  loaded, ctx=262144 images=off
+[server] s1 done  pp=22/0c 0.4s  tg=1 17.7t/s  ttft=0.4s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] s2 read  pp=222253 10s
+[server] s2 read  pp=222253 20s
+[server] s2 read  pp=16384/222253 817t/s 30s
+[server] s2 read  pp=32768/222253 825t/s 40s
+[server] s2 read  pp=32768/222253 825t/s 50s
+[server] s2 read  pp=49152/222253 825t/s 60s
+[server] s2 read  pp=49152/222253 825t/s 70s
+[server] s2 read  pp=49152/222253 825t/s 80s
+[server] s2 read  pp=65536/222253 823t/s 90s
+[server] s2 read  pp=65536/222253 823t/s 100s
+[server] s2 read  pp=81920/222253 821t/s 110s
+[server] s2 read  pp=81920/222253 821t/s 120s
+[server] s2 read  pp=98304/222253 817t/s 130s
+[server] s2 read  pp=98304/222253 817t/s 140s
+[server] s2 read  pp=114688/222253 813t/s 151s
+[server] s2 read  pp=114688/222253 813t/s 161s
+[server] s2 read  pp=131072/222253 809t/s 172s
+[server] s2 read  pp=131072/222253 809t/s 182s
+[server] s2 read  pp=147456/222253 804t/s 193s
+[server] s2 read  pp=147456/222253 804t/s 203s
+[server] s2 read  pp=163840/222253 800t/s 215s
+[server] s2 read  pp=163840/222253 800t/s 225s
+[server] s2 read  pp=180224/222253 796t/s 237s
+[server] s2 read  pp=180224/222253 796t/s 247s
+[server] s2 read  pp=196608/222253 791t/s 259s
+[server] s2 read  pp=196608/222253 791t/s 269s
+[server] s2 read  pp=212992/222253 787t/s 281s
+[server] live | s2 tg=1/16 | total 0t/s
+[server] s2 done  pp=222253/0c 283.8s 783t/s  tg=16 32.9t/s acc=77% dl=2.7  ttft=283.9s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] stopping (Ctrl+C again to force)
+[server] stopped
