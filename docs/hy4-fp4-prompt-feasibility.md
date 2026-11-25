@@ -209,3 +209,11 @@ broken; it is a kernel task, not plumbing. Forcing the generic `launch` instead 
 `launch256` for 1536 still gives 0 (`evidence/fp4-1536-two-term-no256.log`), so it is not that
 dispatch either. The correct, working prototype is therefore the one-term one; the two-term quality
 path is still open.
+
+
+The pair-row two-term gate/up (plain FP4 gate/up + Hy4 `swiglu_split_clamped`, the token GATHER
+avoided) runs at 33k, but its quality is also broken: **KLD 1.67103, top-1 62.98 %**
+(`evidence/hy4-quality-fp4-pairgu.log`). The two-term 1536 problem is therefore the quantize/product
+layout itself, not the token GATHER alone: the plane two-term down is non-zero but wrong, and both
+token and pair-row gates diverge. Quality parity needs a real 1536 two-term kernel fix. The one-term
+path is the only correct one.
