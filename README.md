@@ -174,6 +174,7 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — needs patch 0002 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` |
 | `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts — experimental; needs patch 0003 |
+| `hy4-fp4-1m` | Hy4 | 1 slot × 1,048,576, FP4 prompt experts — experimental; needs patch 0003 |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV |
