@@ -57,50 +57,55 @@ int main() {
     int dev = 0;
     ck(cudaGetDeviceCount(&dev), "device count");
     if (dev <= 0) return 77;
+    constexpr int T = 17232, E = 16, R = 29363;   // rows, experts, and the layer's tokens (R > rows)
+    constexpr size_t STRIDE = BYTES + 128;   // the real stage stride
     std::mt19937 rng(7);
     float tail[3];
     const std::vector<uint8_t> host = make_blob(rng, tail);
-    const std::vector<uint8_t> host2 = make_blob(rng, tail);
-    Dev blob(2 * BYTES);
-    ck(cudaMemcpy(blob.p, host.data(), BYTES, cudaMemcpyHostToDevice), "blob");
-    ck(cudaMemcpy((uint8_t*) blob.p + BYTES, host2.data(), BYTES, cudaMemcpyHostToDevice), "blob2");
-    constexpr int T = 16;
-    std::vector<float> x((size_t) T * N), h((size_t) T * F), out((size_t) T * N);
+    Dev blob((size_t) E * STRIDE + 16);
+    uint8_t* base = (uint8_t*) blob.p + 16;   // the real ring/stage base is 16 mod 128
+    for (int q = 0; q < E; ++q)
+        ck(cudaMemcpy(base + (size_t) q * STRIDE, host.data(), BYTES, cudaMemcpyHostToDevice), "blob");
+    std::vector<float> x((size_t) R * N), h((size_t) T * F), out((size_t) T * N);
     std::normal_distribution<float> nd(0.0f, 1.0f);
     for (float& v : x) v = nd(rng);
-    Dev dx((size_t) T * N * 4), dh((size_t) T * F * 4), dout((size_t) T * N * 4);
-    Dev ids(T * 4), bounds(3 * 4), tile(3 * 4);
-    std::vector<int32_t> id(T), bd{0, 8, T};
-    for (int i = 0; i < T; ++i) id[i] = i;
+    Dev dx((size_t) R * N * 4), dh((size_t) T * F * 4), dout((size_t) T * N * 4);
+    Dev ids(T * 4), bounds((E + 1) * 4), tile((E + 1) * 4);
+    std::vector<int32_t> id(T), bd(E + 1);
+    for (int i = 0; i < T; ++i) id[i] = i % R;
+    bd[0] = 0; bd[1] = 11771;
+    for (int e = 1; e < E; ++e) bd[e + 1] = bd[e] + (T - 11771) / (E - 1);
+    bd[E] = T;
+    const int32_t max_rows = bd[1] - bd[0];
     ck(cudaMemcpy(dx.p, x.data(), x.size() * 4, cudaMemcpyHostToDevice), "x");
     ck(cudaMemcpy(ids.p, id.data(), id.size() * 4, cudaMemcpyHostToDevice), "ids");
     ck(cudaMemcpy(bounds.p, bd.data(), bd.size() * 4, cudaMemcpyHostToDevice), "bounds");
-    fp4::plan(bounds.as<int32_t>(), 2, tile.as<int32_t>(), nullptr);
-    // one-term token planes, like the production Qwen group
-    Dev a4x(fp4::token_bytes(T, N)), gsx(T * 4);
-    fp4::quantize_tokens(dx.as<float>(), T, N, N, a4x.p, gsx.as<float>(), nullptr, false);
+    fp4::plan(bounds.as<int32_t>(), E, tile.as<int32_t>(), nullptr);
+    Dev a4x(fp4::token_bytes(R, N)), gsx(R * 4);
+    fp4::quantize_tokens(dx.as<float>(), R, N, N, a4x.p, gsx.as<float>(), nullptr, false);
     ck(cudaDeviceSynchronize(), "quantize_tokens");
     fp4::Product gu;
-    gu.blob[0] = blob.as<uint8_t>(); gu.blob[1] = blob.as<uint8_t>() + BYTES; gu.w_off = 0; gu.w_rows = 2 * F; gu.w_cols = N; gu.n = 2;
-    gu.a4 = a4x.p; gu.gs = gsx.as<float>(); gu.ids = ids.as<int32_t>(); gu.tokens = T;
+    for (int q = 0; q < E; ++q) gu.blob[q] = base + (size_t) q * STRIDE;
+    gu.w_off = 0; gu.w_rows = 2 * F; gu.w_cols = N; gu.n = E;
+    gu.a4 = a4x.p; gu.gs = gsx.as<float>(); gu.ids = ids.as<int32_t>(); gu.tokens = R;
     gu.bounds = bounds.as<int32_t>(); gu.swiglu = true; gu.tail_off = TAIL_OFF;
-    gu.dst = dh.as<float>(); gu.ld_dst = F; gu.max_rows = 8;
+    gu.dst = dh.as<float>(); gu.ld_dst = F; gu.max_rows = max_rows;
     fp4::run(gu, nullptr);
     ck(cudaDeviceSynchronize(), "gate/up");
-    // H one-term, then the down product
-    Dev a4h(fp4::a4_bytes(T, F, 2)), gsh(fp4::scale_count(T, 2) * 4);
-    fp4::quantize(dh.as<float>(), nullptr, bounds.as<int32_t>(), tile.as<int32_t>(), 2, a4h.p, gsh.as<float>(), F, F, T,
+    Dev a4h(fp4::a4_bytes(T, F, E)), gsh(fp4::scale_count(T, E) * 4);
+    fp4::quantize(dh.as<float>(), nullptr, bounds.as<int32_t>(), tile.as<int32_t>(), E, a4h.p, gsh.as<float>(), F, F, T,
                   nullptr, false);
     ck(cudaDeviceSynchronize(), "quantize H");
     fp4::Product dn;
-    dn.blob[0] = blob.as<uint8_t>(); dn.blob[1] = blob.as<uint8_t>() + BYTES; dn.w_off = DOWN_OFF; dn.w_rows = N; dn.w_cols = F; dn.n = 2;
+    for (int q = 0; q < E; ++q) dn.blob[q] = base + (size_t) q * STRIDE;
+    dn.w_off = DOWN_OFF; dn.w_rows = N; dn.w_cols = F; dn.n = E;
     dn.a4 = a4h.p; dn.gs = gsh.as<float>(); dn.bounds = bounds.as<int32_t>(); dn.tile_off = tile.as<int32_t>();
-    dn.dst = dout.as<float>(); dn.ld_dst = N; dn.max_rows = 8;
+    dn.dst = dout.as<float>(); dn.ld_dst = N; dn.max_rows = max_rows;
     fp4::run(dn, nullptr);
     ck(cudaDeviceSynchronize(), "down");
     ck(cudaMemcpy(out.data(), dout.p, out.size() * 4, cudaMemcpyDeviceToHost), "out");
     bool finite = true;
     for (float v : out) finite = finite && std::isfinite(v);
-    std::printf("fp4 1536: OK, finite=%d, out[0]=%g\n", (int) finite, out[0]);
+    std::printf("fp4 1536: OK, T=%d E=%d R=%d max=%d, finite=%d, out[0]=%g\n", T, E, R, max_rows, (int) finite, out[0]);
     return finite ? 0 : 1;
 }

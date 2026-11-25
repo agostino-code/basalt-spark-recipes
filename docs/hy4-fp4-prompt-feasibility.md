@@ -114,10 +114,14 @@ fp4 1536: OK, finite=1, out[0]=1.04887
 Hy4 prototype's misalignment is in the **real-mode plumbing**. The real geometry was logged
 (`evidence/fp4-1536-real-geometry.log`): `lay.bytes` 3,981,328, `up_off` 1,327,104, `down_off`
 2,654,208, `gu_row`/`d_row` 864, `stride_` 3,981,456 (`bytes` + 128); all the activation/H/blob pointers
-are 16- or 128-byte aligned. Those match the synthetic layout, and the micro-test with two experts
-passes. The remaining difference is the real stage shape — up to 16 experts and ~23k rows per launch
-(the micro used 2 experts / 16 rows) — so the next test is the same micro at 16 experts and ~17k
-rows: that isolates the multi-segment H-plane/down-product layout from the gross pointers.
+are 16- or 128-byte aligned. Those match the synthetic layout. The micro-test now runs at the real
+stage shape — **16 experts, 17,232 rows, max 11,771 per expert, R = 29,363 tokens, the real
+`bytes + 128` stride, and a blob base at 16 mod 128** — and still prints
+`fp4 1536: OK` (`evidence/fp4-1536-microtest-real-shape.log`). So the kernel, the multi-segment H
+planes, the token/row split and the real stride/alignment are all correct. The fault left in the full
+Hy4 path is in the engine's own buffers/data (the `h_`/`a4x`/`a4h` allocations or the real expert
+blobs) or in the stage copy, not in the FP4 product. The next test is the real path with one expert /
+one stage forced, then with the real pack blobs substituted into the micro.
 
 **Qwen already has this**: its prompt path uses `expert_fp4.cpp`/`run_group` at 2304/2560/640, and the
 `prefill_fp4_test` above is its parity test. Nothing has to be implemented for Qwen; it is the reference
