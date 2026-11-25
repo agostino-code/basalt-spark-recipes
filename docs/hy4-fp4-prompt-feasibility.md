@@ -70,3 +70,68 @@ and the group is at least ~30% faster, continue to the full MoE integration; oth
 kernel is there, but the plumbing and the quality gate are not free.
 
 No code has been changed for this study.
+
+## Verified on the GB10 (0.5.7 main)
+
+The shared module is not just theory: the Qwen prefill FP4 parity test (`tests/models/qwen4exp/prefill/prefill_fp4_test.cpp`,
+built with `-DBUILD_TESTING=ON -DBASALT_MODELS=qwen4exp`) passes on this box — `parity: PASS`, bitwise against the
+reference for every routing/run shape, edge tokens finite.
+
+Its benchmark, 16,384 tokens × top 10 over 512 experts:
+
+| Path | Time | vs MMQ |
+|---|---:|---:|
+| NVFP4 MMQ (gathers + q8_1 + gate/up + SwiGLU + down) | 73.7 ms | 1.00× |
+| FP4 layer (plain gate/up + SwiGLU + down) | 47.1 ms | **1.56×** |
+| FP4 token planes + fused SwiGLU | 27.9 ms | **2.64×** |
+
+The FP4-vs-MMQ relative RMS is 0.095 (gate/up) and 0.111 (down), the two-term activation rounding; the
+quality gate is still the real acceptance test. The log is `evidence/fp4-prefill-parity.log`.
+
+## Mapping to Hy4's MoE
+
+Hy4's `NativeExpertLayout` (n_embd = latent 1536, n_ff = 1536) maps directly:
+
+| Hy4 | `fp4::Product` |
+|---|---|
+| staged expert blob (`stage_[i].blobs`) | `blob[16]`, `base`/`stride` if all experts |
+| gate/up at offset 0, `2 * n_ff` rows | `w_off = 0`, `w_rows = 2 * n_ff`, `w_cols = n_latent` |
+| down at `lay.down_off`, `n_latent` rows | `w_off = lay.down_off`, `w_rows = n_latent`, `w_cols = n_ff` |
+| 16-byte tail `{s_gate, s_up, s_down, 0}` | `tail_off = lay.bytes - 16` |
+| `xlat_` rows, token id per pair row | `quantize_tokens(xlat_, R, L, two=true)`, `ids = pair_ident_`, `tokens = R` |
+| `B.bounds` per stage | `bounds`, `max_rows` |
+| H after the gate/up | `dst_f16` (or `dst`), then `quantize`/`quantize_f16` with `plan` + `tile_off` |
+| down output pair rows | `dst = pair_rows_ + pos`, `ld_dst = n_latent` |
+| 16 experts per launch | `n = nb <= 16` |
+
+The token-plane path (`swiglu = true`) is the fast one; it reads each token's FP4 row once for all its
+pair rows, which is exactly Hy4's pair expansion.
+
+## The one semantic gap: the SwiGLU limit
+
+Hy4 clamps the experts' SwiGLU (`swiglu_split_kernel`): `g = min(g, limit)`, `u = clamp(u, -limit, limit)`,
+with the default limit **10.0** (`clamp_exp`), after the tail scales. `moe_fp4`'s fused SwiGLU has the tail
+scales and an optional **softcap** (`tanh`), but not this min-clamp. Two ways out:
+
+1. **Add `swiglu_limit` to the fused FP4 path** (a `Product` field plus a few instructions in
+   `moe_fp4.cu` before the silu). Small, keeps the 2.64× path, but changes the shared module.
+2. **Run the gate/up product plain (`swiglu = false`) and call Hy4's `swiglu_split_clamped`**, then
+   quantize H and run the down product. No shared-kernel change and exact Hy4 semantics; it loses the
+   token-plane fusion, staying near the 1.56× layer number.
+
+The prototype should start with (2) for exactness, then try (1) for the fused gain.
+
+## Prototype plan
+
+1. A `BASALT_FP4_PROMPT=1` switch in `moe_prompt`'s `launch`: allocate the token planes once per layer
+   (`quantize_tokens`), replace the gate/up and down `mmq_.run` with `fp4::Product` calls, keep the Hy4
+   `swiglu_split_clamped` (option 2).
+2. One layer, 33k prompt: compare the FP4 `pair_rows_`/`lat_out_` against the MMQ path (rel RMS) and the
+   next-token logits; then all layers, greedy identity check.
+3. 100-chunk quality gate (same `hy4flash-bf16-base.kld`): the FP4 two-term rounding must stay within the
+   int8-prompt variance; otherwise stop.
+4. Performance: 33k/71k/222k; the expert MMQ is 21% of the 222k prefill, so 1.56–2.64× there is ~7–13%
+   end-to-end; measure the actual.
+
+Estimate: prototype 3–5 days, full path and quality 1–2 weeks. The main risk is the H plane/tile layout
+and the SwiGLU limit, not the FP4 kernel.

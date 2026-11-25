@@ -1,0 +1,44 @@
+parity: 160 tokens, 40 experts, 40 with rows, max rows per expert 147
+  token planes == the tiles' codes, scales and token scales (bitwise, 1600 rows): yes
+  fused SwiGLU H == plain gate/up product + mmq::swiglu (bitwise, 1600 x 640): yes
+  FP4 gate/up vs MMQ-rounding reference: rms 9.385e-02 worst row 1.759e-01;  FP4 vs double: rms 1.581e-01 worst row 3.451e-01
+  FP4 layer output vs double:  rms 1.581e-01 worst row 3.451e-01 (tol rms 0.2);  vs MMQ output: rms 1.587e-01 (tol 0.2)
+  FP4 gate/up vs A4-rounding reference: rms 1.352e-07 (tol 1e-5)
+  FP4 down vs A4-rounding reference:    rms 3.676e-07 worst row 1.515e-06 (tol rms 1e-4)
+  FP4 output independent of tile position and neighbours (bitwise): yes
+  FP4 output hashes (FNV-1a): H 47f8a6861fbb67da, layer d625bae83428efa6
+  fused SwiGLU H vs A4-rounding reference: rms 2.463e-07 worst row 1.484e-06 (tol rms 1e-5)
+  gate/up vs same-rounding reference: rms 1.683e-07  worst row 6.885e-07   (tol 1e-5, 1e-4)
+  MMQ vs same-rounding reference: rms 4.306e-05  worst row 4.317e-03   (tol 2e-4, 1e-2)
+  MMQ vs double reference:        rms 1.606e-02  worst row 3.267e-02   (tol rms 2.5e-2)
+  MMQ vs FP16 fallback:           rms 1.608e-02  worst row 3.244e-02   (tol rms 2e-2)
+  FP16 fallback vs double:        rms 5.213e-04  worst row 1.515e-03
+  grouped gather == per-expert gather (bitwise): yes; zero token exactly 0: yes
+  routing A (2 hot experts): cap 1600 rows: 3 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing A (2 hot experts): cap 129 rows: 15 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing A (2 hot experts): cap 65 rows: 31 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing A (2 hot experts): cap 147 rows: 14 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing A (2 hot experts): cap 1 rows: 40 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing B (5 hot experts): cap 1600 rows: 3 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing B (5 hot experts): cap 129 rows: 16 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing B (5 hot experts): cap 65 rows: 34 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing B (5 hot experts): cap 94 rows: 22 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  routing B (5 hot experts): cap 1 rows: 40 runs over 3 groups, bitwise equal to the absolute-row sequence: yes, guards: clear
+  edge token 0: gate/up vs A4 reference rel rms 0.000e+00, finite yes, reference exactly zero -> ok
+  edge token 1: gate/up vs A4 reference rel rms 5.753e-08, finite yes -> ok
+  edge token 2: gate/up vs A4 reference rel rms 3.873e-08, finite yes -> ok
+  edge token 3: gate/up vs A4 reference rel rms 5.210e-08, finite yes -> ok
+  edge token 4: gate/up vs A4 reference rel rms 7.297e-08, finite yes -> ok
+  edge token 5: gate/up vs A4 reference rel rms 3.897e-08, finite yes -> ok
+  edge token 6: gate/up vs A4 reference rel rms 6.025e-08, finite yes -> ok
+  edge token 7: gate/up vs A4 reference rel rms 6.148e-08, finite yes -> ok
+  edge token 0 through the whole path: finite yes, max |out| 0.000e+00 (must be exactly 0) -> ok
+  edge token 1 through the whole path: finite yes, max |out| 9.300e-01 -> ok
+  edge token 2 through the whole path: finite yes, max |out| 1.493e+00 -> ok
+  edge token 3 through the whole path: finite yes, max |out| 0.000e+00 -> ok
+  edge token 6 through the whole path: finite yes, max |out| 1.943e+00 -> ok
+  edge token 7 through the whole path: finite yes, max |out| 0.000e+00 -> ok
+parity: PASS
+bench: FP4 layer 47113.1 us (x1.56 vs MMQ); rel rms fp4 vs mmq: gate/up 9.504e-02 (tail-free), down 1.106e-01
+bench: FP4 expert path, 16384 tokens x top 10 over 512 experts: quantize per row + plain gate/up + SwiGLU 47113.1 us (34.2 TFLOP/s), token planes + fused SwiGLU 27891.9 us (57.7 TFLOP/s), x1.69
+bench: NVFP4 MMQ layer, 16384 tokens x top 10 over 512 experts (512 with rows): 73705.7 us, 21.9 TFLOP/s (gathers + q8_1 + gate/up + SwiGLU + down)
