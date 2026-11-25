@@ -179,3 +179,28 @@ The prototype should start with (2) for exactness, then try (1) for the fused ga
 
 Estimate: prototype 3–5 days, full path and quality 1–2 weeks. The main risk is the H plane/tile layout
 and the SwiGLU limit, not the FP4 kernel.
+
+
+## Working prototype (one-term) and the quality trade
+
+The full-path fault was the **down product's destination row offset**: the stage code passed
+`pair_rows_ + pos` where `pos` is a pair-row index, not a row byte/float offset. With
+`pair_rows_ + pos * n_latent` the FP4 path runs:
+
+| Prompt | MMQ | FP4 one-term |
+|---|---:|---:|
+| 33k | 31.4 s | **24.8 s** |
+| 222k | 270 s | **237.5 s** (943 tok/s) |
+| MoE stage, 33k | 11.3 s | **4.5 s** |
+| MoE stage, 222k | 85.3 s | **36.2 s** |
+
+The quality gate, though, pays for the 4-bit activations: **PPL 17.2129, KLD 0.22542, top-1
+85.40 %** against MMQ's 17.6184 / 0.20460 / 86.22 % (`evidence/hy4-quality-fp4-1term.log`). It is a
+real but modest degradation, not parity.
+
+The obvious fix would be the two-term (~8-bit) activations, but at 1536 the two-term path is
+**wrong**: two-term gate/up and two-term H/down give KLD **1.775 / 1.745** and top-1 **62 %**
+(`evidence/hy4-quality-fp4-2term.log`, `hy4-quality-fp4-hybrid.log`). The two-term 1536 quantize
+dispatch compiles, but its plane/tile layout is not the one the product reads; that is a separate
+kernel task. The correct, working prototype is therefore the one-term one; the two-term quality path
+is still open.
