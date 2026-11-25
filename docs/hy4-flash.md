@@ -84,6 +84,19 @@ be about 5 % of the prefill. The hyper-connection kernels (~11 %) and the MoE ro
 (~10 %) are the next Hy4-specific blocks. At longer contexts attention grows faster than the rest, so
 a 262k profile is the one to take before deciding to rewrite it; at 33k/80k it is not the first
 target. The full kernel tables are in [evidence/hy4-prefill-kernels.txt](../evidence/hy4-prefill-kernels.txt).
+
+At **222k tokens on 0.5.7** (nsys, `evidence/hy4-prefill-kernels-222k-0.5.7.txt`) the picture moves:
+the NVFP4 expert MMQ is the largest single kernel (**21 %**), the dense Q8_0 MMQ 19 %, attention 13 %,
+the activation quantizer 9 %, the indexer 8 % (scores + select), router + SwiGLU 8 %, K/V prepare 3 %,
+and the hyper-connection kernels ~11 %. Attention + indexer + prepare are ~24 %; experts + router +
+SwiGLU ~30 %; dense + quantizer ~28 %.
+
+At **624k tokens** the stage split is attention/dense **999.7 s**, MoE 255.5 s, Engram 66.7 s: the
+attention/dense share grows from ~66 % at 222k to ~76 %, which is the O(n²) attention plus the 8k
+chunk cap (the 422k-token difference runs at 466 tok/s against 823 at 222k). The 620k kernel-level
+report was not finalised (the server stopped the engine before nsys wrote the file), so the exact
+attention/ dense split at 624k is still to be measured; the stage times put attention at the top of
+the long-context list.
 A feasibility study for moving the prompt experts to the shared FP4 tensor-core module is in
 [hy4-fp4-prompt-feasibility.md](hy4-fp4-prompt-feasibility.md): the module is already in this tree and
 Qwen uses it on the same GB10, so the work is Hy4 plumbing (roughly 1.5–2 weeks), not a new kernel.
