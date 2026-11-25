@@ -62,6 +62,8 @@ not tested*; both appendices are that validation for their pack.
   dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
+* [docs/spark-branch.md](docs/spark-branch.md) — the official `spark` branch as the base for the next
+  version, the differences from this tree and the PR plan.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
   measured tables, the four-slot trap, the Infernix comparison and the credits.
 * `basalt-port/` — the engine tree: a gitignored working checkout of the fork, with `build/`, `.venv/`,
