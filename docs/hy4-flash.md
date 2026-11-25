@@ -54,6 +54,31 @@ Benchmark results, both on the public leaderboards:
 For reference: on the codec leaderboard the cap without a verified roundtrip is 25, the top of the
 board is around 127, strong local lanes around 85 — 57 is a real codec, mid-field, about on par with Qwen3.8-Flash-Next NVFP4
 
+### Where the prefill goes
+
+`nsys` kernel summary of one 33k and one 80k prompt through `hy4-agent` (the engine under a
+`--engine-bin` wrapper that carries the flag list the server reads; `nsys stats --report
+cuda_gpu_kern_sum`; the sum includes the load and decode tails, so the shares are indicative):
+
+| Kernel group | 33k | 80k |
+|---|---:|---:|
+| Dense Q8_0 MMQ (`mul_mat_q`, type 8) | 20 % | 20 % |
+| NVFP4 expert MMQ (`mul_mat_q`, type 40) | 19 % | 19 % |
+| Attention (`attend_mma`) | 14 % | 14 % |
+| Activation quantize (`quantize_mmq_q8_1`) | 11 % | 10 % |
+| Router + SwiGLU + weighted sum | 11 % | 10 % |
+| Hyper-connections (`hc_*` + `plain_partial` + `mul_sigmoid`) | 12 % | 10 % |
+| K/V prepare (`prepare_kernel`) | 4 % | 4 % |
+| Indexer scores + select | 2 % | 2 % |
+| Engram and other | ~1 % | ~1 % |
+
+The prefill is **MMQ-bound**: dense Q8_0 and NVFP4 experts together are ~39–40 %, and the activation
+quantizer another 10–11 %. Attention is 14 % plus 4 % of K/V prepare; a 30 % faster attention would
+be about 5 % of the prefill. The hyper-connection kernels (~11 %) and the MoE routing/activation
+(~10 %) are the next Hy4-specific blocks. At longer contexts attention grows faster than the rest, so
+a 262k profile is the one to take before deciding to rewrite it; at 33k/80k it is not the first
+target. The full kernel tables are in [evidence/hy4-prefill-kernels.txt](../evidence/hy4-prefill-kernels.txt).
+
 ### Quality against the BF16 reference
 
 The Engram gate normed the stream and the key with bf16's machine epsilon (`0.0078125`) where the

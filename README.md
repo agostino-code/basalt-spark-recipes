@@ -57,7 +57,8 @@ not tested*; both appendices are that validation for their pack.
   resident refusal (`qwen-batch-int8-regression.log`, `qwen-fp16-resident-refused.log`), the batch
   logprob comparison (`qwen-batch-logprobs.log`), the pre-patch fp16 refusal (`qwen-fp16-batch-refused.log`),
   the long Hy4 windows after 0003 (`hy4-long-2x524.log`, `hy4-long-1m.log`), the 33k/80k prefill
-  after 0003 (`hy4-prefill-33k.log`, `hy4-prefill-80k.log`), plus the one RAM-tier fault seen before
+  after 0003 (`hy4-prefill-33k.log`, `hy4-prefill-80k.log`), the nsys kernel profile
+  (`hy4-prefill-kernels.txt`), plus the one RAM-tier fault seen before
   dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
@@ -193,6 +194,7 @@ condensed record, with the measured figures kept exact.
 | Context per request | **262,144 tokens, prompt + answer together**; 165,022, 220,022, 249,997 and 261,987 tokens pass, 264,022 is refused, so the window itself is the limit |
 | Slots / KV | four slots × 262,144 = 1,048,576 cells; KV ≈ 15 GiB, experts resident in VRAM (`ram-experts=0.0GB`) |
 | Quality vs BF16 | **PPL 17.5207 ± 0.4442** (base 18.4162), **KLD mean 0.20300**, **same top-1 86.32 %** — 100 chunks, 25,500 rows, T=1, after the Engram epsilon fix (#556). The pre-fix engine reads 0.782 KLD / 76.77 % on the same base |
+| Prefill profile | **dense Q8_0 20 %, NVFP4 experts 19 %, attention 14 %, activation quantize 10–11 %, router + SwiGLU ~9 %, hyper-connections ~11 %** — nsys at 33k/80k, [details](docs/hy4-flash.md#where-the-prefill-goes) |
 | Benchmarks | opencode-bench-plusplus, suite `locker-v5`, variant `default`: quality **0.9881**, wall **42:36**, 102 steps, peak request 104,014 tokens — measured on `8172978`, before #556. codec-reverse-bench, variant `high`: **57.0** points, roundtrip solved in stage 3 (35 of 57), 11/15 structure questions, compression ratio 61.2 |
 | Stability | **0 engine faults** across both benchmark runs (≈500 requests, peak request 128k tokens) |
 
