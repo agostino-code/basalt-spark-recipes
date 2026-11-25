@@ -239,13 +239,19 @@ windows at once do not, and the failure is not a refusal — it is swapping:
 |---|---|---|---|
 | 1 × 252,425 | 140.5 s (1,797 tok/s) | 56.8 tok/s | ~145 s |
 | 2 × 252,010 | 152 s / 168 s | 26.0 / 35.9 tok/s | 323 s |
-| 4 × 252,010 | 187 / 335 / 480 / 620 s | 8.6 / 23.4 / 34.9 / 0.4 tok/s | **621.7 s** |
+| 4 × 252,010 (0.5.0) | 187 / 335 / 480 / 620 s | 8.6 / 23.4 / 34.9 / 0.4 tok/s | **621.7 s** |
+| 4 × 246,455 (0.5.7 main+patches) | 111 / 227 / 343 / 462 s | 15.4 / 20.3 / 4.7 / 36.3 tok/s | all answered; 120 GiB + 2 GiB swap |
 
 The engine's own log shows the prefills serialising (each 140–145 s of engine time) while the box has
 `MemAvailable` under 2 GiB and almost 8 GB of swap in use. The engine still answered every request — no fault,
 no refusal — but the lane spends minutes queueing and some streams decode at under 1 tok/s. For agent
 workloads this is the expensive failure the Hy4 README warns about, in a new form: not a crash, a
 throughput collapse.
+
+On 0.5.7 main+patches the same shape is **better but still the trap**: four 246,455-token sessions all
+answered (HTTP 200), the last TTFT fell from 620 s to 462 s and the worst decode from 0.4 to 4.7 tok/s,
+with 120 GiB in use and 2 GiB of swap. The prefills still serialise; two full windows remain the clean
+configuration. The log is `evidence/qwen-four-slot-0.5.7-main.log`.
 
 Batching itself is fine when the prompts are small: with 81-token prompts asking for 700-token answers,
 one stream decodes at 44.3 tok/s, two at 28.0 each (53 tok/s together) and four at 18.6 each (67 tok/s

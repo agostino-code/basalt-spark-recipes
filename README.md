@@ -276,10 +276,11 @@ Both PRs are open; the patch files remain in this repository until they merge.
   figure, not against `free -g`. Another lane holding the GPU leaves a new engine with no memory at
   all — `nvidia-smi` and `cudaGetDeviceCount` both fail until it stops.
 * **The four-slot trap (Qwen).** The server accepts `--parallel 4 --max-context 1048576` and plans
-  four full windows, and one full window works exactly as planned. Four at once do not fail; they
-  swap. Four 252,010-token sessions took 621.7 s wall, with TTFT 187–620 s and decode as low as
-  0.4 tok/s. Two full windows are the largest configuration that measured cleanly. The engine still
-  answered every request — a throughput collapse, not a crash.
+  four full windows, and one full window works exactly as planned. Four at once do not fail, but they
+  swap. On 0.5.7 main+patches four **246,455-token** sessions all answered (HTTP 200): TTFT
+  111 / 227 / 343 / 462 s, decode 15.4 / 20.3 / 4.7 / 36.3 tok/s, 120 GiB in use and 2 GiB of swap.
+  That is better than 0.5.0 (621.7 s wall, TTFT 187–620 s, decode 0.4–34.9 tok/s) but still ~7.7 min
+  to the last TTFT and one stream at 4.7 tok/s; two full windows remain the clean configuration.
 * **Vision costs concurrency (Hy4).** The image encoder's reservation is taken per slot: with
   `--vision dynamic` only a single slot starts; `--parallel 2/3/4` dies in the planning step with
   `RAM ran out loading` at every context size from 65536 to 524288. Vision and the four-slot agent
