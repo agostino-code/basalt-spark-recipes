@@ -78,6 +78,9 @@ be about 5 % of the prefill. The hyper-connection kernels (~11 %) and the MoE ro
 (~10 %) are the next Hy4-specific blocks. At longer contexts attention grows faster than the rest, so
 a 262k profile is the one to take before deciding to rewrite it; at 33k/80k it is not the first
 target. The full kernel tables are in [evidence/hy4-prefill-kernels.txt](../evidence/hy4-prefill-kernels.txt).
+A feasibility study for moving the prompt experts to the shared FP4 tensor-core module is in
+[hy4-fp4-prompt-feasibility.md](hy4-fp4-prompt-feasibility.md): the module is already in this tree and
+Qwen uses it on the same GB10, so the work is Hy4 plumbing (roughly 1.5–2 weeks), not a new kernel.
 
 Two cheap dense-path knobs were tried and rejected: 4,096-row attention steps (the doubled buffers
 ran the lane into RAM/checkpoint failures) and tiling the Q8_0 MMQ rows (about 20% slower than the
