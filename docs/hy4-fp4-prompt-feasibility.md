@@ -46,8 +46,8 @@ by the Qwen lane; what is missing is the Hy4 plumbing, not a kernel.
 4. **Performance** (1–2 days): the same 33k/80k prompts and the nsys kernel summary; the FP4 product
    must beat the 19% expert MMQ share plus its share of the quantizer to be worth the complexity.
 
-Total: roughly **1.5–2 weeks**, no new CUDA kernel; the main risk is the layout/routing plumbing, not
-the tensor-core code.
+Total: the plumbing alone is ~1.5–2 weeks, but the 1536 kernel/tile support is the real work (see
+“The module is dimension-specialized” below); the main risk is the tensor-core code, not the routing.
 
 ## Risks
 
@@ -101,8 +101,9 @@ basalt: error: prefill fp4: 1536 token columns (two terms)
 
 (`evidence/fp4-hy4-1536-error.log`). I then added the 1536 quantize dispatches (`quantize_kernel<3>`
 for tokens/planes/f16); they compile, but the next step, the FP4 **gemm**, faults with
-`prefill fp4: gemm: misaligned address` (`evidence/fp4-hy4-1536-gemm-error.log`). The product/tile
-geometry is dimension-specialized as well, not only the quantizer. A Hy4 FP4 path therefore needs
+`prefill fp4: gemm: misaligned address` (`evidence/fp4-hy4-1536-gemm-error.log`). It still faults with
+one-term activations and one-term H (`evidence/fp4-hy4-1536-gemm-oneterm.log`), so the product/tile
+geometry — not the two-term quantizer — is the blocker. A Hy4 FP4 path therefore needs
 **new kernel/tile work for 1536** — the token-plane quantizer, the activation-plane quantizer, and the
 product/tile geometry — not just plumbing. The earlier 1.5–2 week estimate was optimistic; the kernel
 support is the bulk of the work (closer to 3–5 weeks), and it should start with a 1536 micro-benchmark
