@@ -205,5 +205,7 @@ two-term gate/up at 1536 outputs **0** where the one-term outputs 0.871685. The 
 is not the problem: the token planes it writes are non-zero (`a4x[0..15]=e1ec4719…`,
 `gsx=0.00148…` in `evidence/fp4-1536-two-term-planes.log`), but the two-term **product** still
 returns zero. So the one-term 1536 kernel is correct and the two-term 1536 GATHER/tile layout is
-broken; it is a kernel task, not plumbing. The correct, working prototype is therefore the one-term
-one; the two-term quality path is still open.
+broken; it is a kernel task, not plumbing. Forcing the generic `launch` instead of the 256-row
+`launch256` for 1536 still gives 0 (`evidence/fp4-1536-two-term-no256.log`), so it is not that
+dispatch either. The correct, working prototype is therefore the one-term one; the two-term quality
+path is still open.
