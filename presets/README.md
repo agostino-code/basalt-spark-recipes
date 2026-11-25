@@ -19,15 +19,16 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV | the measured agent baseline; port 30000 |
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV | half the KV (~15 → ~8.7 GiB), the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV | lower memory, shorter queue |
-| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; needs patch 0003 |
-| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; needs patch 0003 |
+| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; needs patch 0002 |
+| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; needs patch 0002 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` | image input; mutually exclusive with the four-slot shape |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV | the measured baseline; port 30001 |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV | the largest configuration that measured cleanly |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV | one full window at a time |
 | `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV | one full window in fp16 |
-| `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV | two full windows in fp16; needs patch 0002 |
-| `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV | four windows in fp16 at int8's KV size; needs patch 0002 |
+| `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV | two full windows in fp16; needs patch 0001 |
+| `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV | four windows in fp16 at int8's KV size; needs patch 0001 |
+| `qwen-yarn-524` | Qwen | 1 slot × 524,288, fp16 KV, YaRN ×2 | experimental: twice the native 262,144 window; check long-context quality before trusting it |
 
 ## Measured
 

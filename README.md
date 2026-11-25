@@ -23,7 +23,7 @@ to the tree this unified installer builds. This README is the shared install and
 > the third-party port). The 0.5.0-specific sm_121 patch is gone: main has the platform support. Only
 > two patches remain — 0001 Qwen FP16 batch windows, 0002 Hy4 prompt-chunk policy. The 0.5.7 base
 > was validated on the GB10: 33k **31,4 s**, 71k **77,5 s**, 222k **270 s** (0.5.0: 32,4 / 78,8 /
-> 292), the 100-chunk gate **17,6184 PPL / 0,20460 KLD / 86,22 % top-1**, all 12 presets and both
+> 292), the 100-chunk gate **17,6184 PPL / 0,20460 KLD / 86,22 % top-1**, all 12 measured presets (and the experimental YaRN one) and both
 > installer smokes pass, and a **624.830-token prompt** completes in 1325 s with no illegal access
 > (the 8k cap). The 0.5.0 tables in the appendices remain the historical record. Upstream:
 > [#694](https://github.com/jesdga95/basalt/pull/694) and
@@ -179,6 +179,7 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV — one full window |
 | `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV — needs patch 0001 |
 | `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV — needs patch 0001; 15.2 GiB of KV |
+| `qwen-yarn-524` | Qwen | 1 slot × 524,288, fp16 KV, YaRN ×2 — experimental, twice the native 262,144 window |
 
 `hy4-fp8` halves the KV for +0.004 KLD and no top-1 loss; every preset's tested numbers are in
 [presets/README.md#measured](presets/README.md#measured).

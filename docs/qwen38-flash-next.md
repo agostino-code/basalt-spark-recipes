@@ -229,6 +229,29 @@ python3 tools/qwen-lane-check.py --base http://127.0.0.1:30001 --log <the lane's
 Measured on this box: R1 16,406 tokens (9.2 s, 1,887 tok/s), R2 32,828 (16.7 s, 2,015 tok/s),
 R3 33,304 (10.3 s, 1,695 tok/s with the prefix reused) — **PASS**, 0 fault-like lines.
 
+## YaRN: extending the 262,144 window
+
+YaRN is **already implemented** in the engine, not something this project has to add. The Qwen rope
+kernel blends extrapolation and interpolation along the pairs, and the flags are parsed by
+`src/model/rope_flags.cpp`:
+
+```sh
+--rope-scaling yarn --rope-scale 2 --yarn-orig-ctx 262144 --yarn-ext-factor 2   --yarn-beta-fast 32 --yarn-beta-slow 1   # the betas are optional
+```
+
+On the GB10 with the Qwen pack, one 524,288-token slot and fp16 KV starts and answers (HTTP 200); the
+engine log reports `rope scaling yarn, factor 2 (freq_scale 0.5, base 1e+07, mscale 1.069315)` and the
+YaRN magnitude correction. The preset is
+[`qwen-yarn-524`](../presets/qwen-yarn-524.conf).
+
+This is **experimental**: 262,144 is the model's trained window, so the 2× extension is
+out-of-distribution and needs a long-context quality check before it is trusted for answers. The
+recipe's measured Qwen presets stay at the native window.
+
+Hy4's MLA path does **not** consume `RopeScaling`: its rotation is a plain `rope_base` in
+`src/models/hy4flash/kernels/mla.cu`, so the generic YaRN flags do not extend Hy4. Its 1M window is
+native; extending it would be an MLA/indexer change, not a flag.
+
 ## The four-slot trap: this box cannot hold four full windows
 
 The server accepts `--parallel 4 --max-context 1048576` and plans it: four full 262,144-token windows,
