@@ -79,6 +79,12 @@ be about 5 % of the prefill. The hyper-connection kernels (~11 %) and the MoE ro
 a 262k profile is the one to take before deciding to rewrite it; at 33k/80k it is not the first
 target. The full kernel tables are in [evidence/hy4-prefill-kernels.txt](../evidence/hy4-prefill-kernels.txt).
 
+Two cheap dense-path knobs were tried and rejected: 4,096-row attention steps (the doubled buffers
+ran the lane into RAM/checkpoint failures) and tiling the Q8_0 MMQ rows (about 20% slower than the
+stream-k rows at 33k). The dense path's next real steps are fusing the activation quantizer into the
+MMQ (the quantizer is ~10% on its own) or moving the prompt experts to FP4 tensor cores (19% plus a
+share of the quantizer).
+
 ### Quality against the BF16 reference
 
 The Engram gate normed the stream and the key with bf16's machine epsilon (`0.0078125`) where the
