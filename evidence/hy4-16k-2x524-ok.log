@@ -1,0 +1,29 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=524288 (1048576/2 slots) batch=2 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30004/v1  openai+anthropic  stats http://127.0.0.1:30004/
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=14
+[server] ram      floor 2.0 GiB of 104.6 GiB free
+[server] placed   ram 0.4GiB 0.5s
+[server] loading model weights [===========>            ]  39.8/85.5 GiB  2853 MB/s
+[server] placed   cuda0 85.2GiB 33.1s
+[server] loaded   85.5GiB 33.5s  cuda0=85.1GiB ram=0.4GiB
+[server] slots    slots 2 × 524288 ctx (slot-full-context: 1048576 each), others queue
+[server] weights  loaded, ctx=524288 images=off
+[server] s1 done  pp=22/0c 0.4s  tg=1 15.7t/s  ttft=0.5s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] thinking budget 16 tokens, output cap 32 (answer-room auto)
+[server] s2 read  pp=71142 10s
+[server] s2 read  pp=71142 20s
+[server] s2 read  pp=16384/71142 810t/s 30s
+[server] s2 read  pp=32768/71142 815t/s 40s
+[server] s2 read  pp=32768/71142 815t/s 50s
+[server] s2 read  pp=32768/71142 815t/s 60s
+[server] s2 read  pp=49152/71142 815t/s 70s
+[server] s2 read  pp=49152/71142 815t/s 80s
+[server] s2 read  pp=71141/71142 805t/s 88s
+[server] thinking budget reached (16 tokens), wrapping up
+[server] s2 done  pp=71142/0c 88.5s 804t/s  tg=22 27.1t/s acc=100% dl=2.3  ttft=88.6s  end=stop  hit=100.0%  pcie=0.0%
+[server] stopping (Ctrl+C again to force)
+[server] stopped

@@ -1,0 +1,116 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=1048576 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30004/v1  openai+anthropic  stats http://127.0.0.1:30004/
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=14
+[server] ram      floor 2.0 GiB of 105.8 GiB free
+[server] placed   ram 0.4GiB 0.8s
+[server] loading model weights [===========>            ]  41.9/85.5 GiB  2881 MB/s
+[server] placed   cuda0 85.2GiB 32.7s
+[server] loaded   85.5GiB 32.9s  cuda0=85.1GiB ram=0.4GiB
+[server] weights  loaded, ctx=1048576 images=off
+[server] s1 done  pp=22/0c 0.4s  tg=1 14.4t/s  ttft=0.5s  end=length  hit=100.0%  pcie=0.0%
+[server] warning: max tokens reached while thinking, no answer (set reasoning_budget_tokens, or start with --reasoning-budget-tokens)
+[server] s1 read  pp=624832 10s
+[server] s1 read  pp=624832 20s
+[server] s1 read  pp=16384/624832 808t/s 30s
+[server] s1 read  pp=32768/624832 817t/s 40s
+[server] s1 read  pp=32768/624832 817t/s 50s
+[server] s1 read  pp=49152/624832 818t/s 60s
+[server] s1 read  pp=49152/624832 818t/s 70s
+[server] s1 read  pp=49152/624832 818t/s 80s
+[server] s1 read  pp=65536/624832 817t/s 90s
+[server] s1 read  pp=65536/624832 817t/s 100s
+[server] s1 read  pp=81920/624832 815t/s 111s
+[server] s1 read  pp=81920/624832 815t/s 121s
+[server] s1 read  pp=98304/624832 812t/s 131s
+[server] s1 read  pp=98304/624832 812t/s 141s
+[server] s1 read  pp=114688/624832 808t/s 152s
+[server] s1 read  pp=114688/624832 808t/s 162s
+[server] s1 read  pp=131072/624832 803t/s 173s
+[server] s1 read  pp=131072/624832 803t/s 183s
+[server] s1 read  pp=147456/624832 798t/s 195s
+[server] s1 read  pp=147456/624832 798t/s 205s
+[server] s1 read  pp=163840/624832 794t/s 216s
+[server] s1 read  pp=163840/624832 794t/s 226s
+[server] s1 read  pp=180224/624832 790t/s 238s
+[server] s1 read  pp=180224/624832 790t/s 248s
+[server] s1 read  pp=196608/624832 786t/s 260s
+[server] s1 read  pp=196608/624832 786t/s 270s
+[server] s1 read  pp=212992/624832 782t/s 283s
+[server] s1 read  pp=212992/624832 782t/s 293s
+[server] s1 read  pp=229376/624832 777t/s 305s
+[server] s1 read  pp=229376/624832 777t/s 315s
+[server] s1 read  pp=245760/624832 773t/s 328s
+[server] s1 read  pp=245760/624832 773t/s 338s
+[server] s1 read  pp=262144/624832 769t/s 351s
+[server] s1 read  pp=262144/624832 769t/s 361s
+[server] s1 read  pp=278528/624832 764t/s 374s
+[server] s1 read  pp=278528/624832 764t/s 385s
+[server] s1 read  pp=294912/624832 760t/s 398s
+[server] s1 read  pp=294912/624832 760t/s 408s
+[server] s1 read  pp=311296/624832 755t/s 422s
+[server] s1 read  pp=311296/624832 755t/s 432s
+[server] s1 read  pp=327680/624832 751t/s 447s
+[server] s1 read  pp=327680/624832 751t/s 457s
+[server] s1 read  pp=344064/624832 746t/s 471s
+[server] s1 read  pp=344064/624832 746t/s 481s
+[server] s1 read  pp=360448/624832 742t/s 496s
+[server] s1 read  pp=360448/624832 742t/s 506s
+[server] s1 read  pp=376832/624832 737t/s 511s
+[server] s1 read  pp=376832/624832 737t/s 521s
+[server] s1 read  pp=376832/624832 737t/s 531s
+[server] s1 read  pp=393216/624832 732t/s 537s
+[server] s1 read  pp=393216/624832 732t/s 548s
+[server] s1 read  pp=393216/624832 732t/s 558s
+[server] s1 read  pp=409600/624832 725t/s 565s
+[server] s1 read  pp=409600/624832 725t/s 575s
+[server] s1 read  pp=409600/624832 725t/s 585s
+[server] s1 read  pp=409600/624832 725t/s 595s
+[server] s1 read  pp=425984/624832 715t/s 606s
+[server] s1 read  pp=425984/624832 715t/s 616s
+[server] s1 read  pp=425984/624832 715t/s 626s
+[server] s1 read  pp=442368/624832 701t/s 641s
+[server] s1 read  pp=442368/624832 701t/s 651s
+[server] s1 read  pp=442368/624832 701t/s 661s
+[server] s1 read  pp=442368/624832 701t/s 671s
+[server] s1 read  pp=458752/624832 682t/s 682s
+[server] s1 read  pp=458752/624832 682t/s 692s
+[server] s1 read  pp=458752/624832 682t/s 702s
+[server] s1 read  pp=458752/624832 682t/s 712s
+[server] s1 read  pp=475136/624832 659t/s 721s
+[server] s1 read  pp=475136/624832 659t/s 731s
+[server] s1 read  pp=475136/624832 659t/s 741s
+[server] s1 read  pp=475136/624832 659t/s 751s
+[server] s1 read  pp=475136/624832 659t/s 761s
+[server] s1 read  pp=475136/624832 659t/s 771s
+[server] s1 read  pp=491520/624832 634t/s 785s
+[server] s1 read  pp=491520/624832 634t/s 795s
+[server] s1 read  pp=491520/624832 634t/s 805s
+[server] s1 read  pp=491520/624832 634t/s 815s
+[server] s1 read  pp=491520/624832 634t/s 825s
+[server] s1 read  pp=507904/624832 609t/s 834s
+[server] s1 read  pp=507904/624832 609t/s 844s
+[server] s1 read  pp=507904/624832 609t/s 854s
+[server] s1 read  pp=507904/624832 609t/s 864s
+[server] s1 read  pp=507904/624832 609t/s 874s
+[server] s1 read  pp=507904/624832 609t/s 884s
+[server] s1 read  pp=507904/624832 609t/s 894s
+basalt serve: error: no progress for 60 s during a request (reading the prompt, from token 0) - stopping the engine so the server starts it again
+basalt serve: error: stall report (engine 0.5.7): stage "reading the prompt, from token 0" for 893 s; 0 layers served since the last finished step (0 = stopped, more = slow)
+  expert pool: epoch 0, batch epoch 0: 0 of 0 jobs claimed, 0 done; 14 of 14 workers parked, 14 sleeping; mode 0
+  expert pool active workers: 14
+  expert pool threads: w0=sleeping w1=sleeping w2=sleeping w3=sleeping w4=sleeping w5=sleeping w6=sleeping w7=sleeping w8=sleeping w9=sleeping w10=sleeping w11=sleeping w12=sleeping w13=sleeping; host idle for 928179 ms
+  threads waiting on the disk (state D): 0 of 277
+  memory: 2069 MiB resident, 0 MiB in swap, 7040 MiB RAM available; 0 major page faults so far
+  2 s later:
+  expert pool: epoch 0, batch epoch 0: 0 of 0 jobs claimed, 0 done; 14 of 14 workers parked, 14 sleeping; mode 0
+  expert pool active workers: 14
+  expert pool threads: w0=sleeping w1=sleeping w2=sleeping w3=sleeping w4=sleeping w5=sleeping w6=sleeping w7=sleeping w8=sleeping w9=sleeping w10=sleeping w11=sleeping w12=sleeping w13=sleeping; host idle for 930183 ms
+  threads waiting on the disk (state D): 0 of 277
+  memory: 2087 MiB resident, 0 MiB in swap, 7024 MiB RAM available; 0 major page faults so far
+[server] warning: the engine ended (no exit status), last error in its log: basalt serve: error: stall report (engine 0.5.7): stage "reading the prompt, from token 0" for 893 s; 0 layers served since the last finished step (0 = stopped, more = slow) | expert pool: epoch 0, batch epoch 0: 0 of 0 jobs claimed, 0 done; 14 of 14 workers parked, 14 sleeping; mode 0 | expert pool active workers: 14 | expert pool threads: w0=sleeping w1=sleeping w2=sleeping w3=sleeping w4=sleeping w5=sleeping w6=sleeping w7=sleeping w8=sleeping w9=sleeping w10=sleeping w11=sleeping w12=sleeping w13=sleeping; host idle for 928179 ms | threads waiting on the disk (state D): 0 of 277 | memory: 2069 MiB resident, 0 MiB in swap, 7040 MiB RAM available; 0 major page faults so far | 2 s later: | expert pool: epoch 0, batch epoch 0: 0 of 0 jobs claimed, 0 done; 14 of 14 workers parked, 14 sleeping; mode 0 | expert pool active workers: 14 | expert pool threads: w0=sleeping w1=sleeping w2=sleeping w3=sleeping w4=sleeping w5=sleeping w6=sleeping w7=sleeping w8=sleeping w9=sleeping w10=sleeping w11=sleeping w12=sleeping w13=sleeping; host idle for 930183 ms | threads waiting on the disk (state D): 0 of 277 | memory: 2087 MiB resident, 0 MiB in swap, 7024 MiB RAM available; 0 major page faults so far (the next request restarts it, log /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log)
+[server] s1 done  pp=624832/0c  tg=0  end=error
+[server] stopping (Ctrl+C again to force)
+[server] stopped

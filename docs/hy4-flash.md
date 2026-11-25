@@ -106,6 +106,13 @@ launch cap does not let the 8k chunk cap go. A root fix would have to address th
 quantize/MMQ path itself (the sticky tag is `quantize`); the 8k cap remains the safe maximum, and no
 localized split was found. This is why the long 624k prompt runs at 466 tok/s.
 
+A second run separated the two knobs: **16k chunk with the stock `kLaunchRows = 32768`** passes the
+2 × 524,288 / 71k prompt in 88.5 s (8k: 88.6 s), so the earlier failure was the lowered launch cap,
+not the 16k chunk. But the same 16k chunk on the **624k prompt stalls**: the engine reads the prompt
+to 624,832 then reports `stage "reading the prompt, from token 0" for 893 s; 0 layers served`, with
+the expert pool parked (`evidence/hy4-16k-620k-stall.log`). The 8k cap is therefore still required for
+the very long prompt, and at 71k the 16k chunk buys nothing; the cap stays.
+
 At **624k tokens** the stage split is attention/dense **999.7 s**, MoE 255.5 s, Engram 66.7 s: the
 attention/dense share grows from ~66 % at 222k to ~76 %, which is the O(n²) attention plus the 8k
 chunk cap (the 422k-token difference runs at 466 tok/s against 823 at 222k). The 620k kernel-level
