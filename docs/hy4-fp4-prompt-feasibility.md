@@ -99,10 +99,14 @@ prototype call exits with
 basalt: error: prefill fp4: 1536 token columns (two terms)
 ```
 
-(`evidence/fp4-hy4-1536-error.log`). A Hy4 FP4 path therefore needs **new kernel/quantize instantiations
-for 1536** — the token-plane quantizer, the activation-plane quantizer, and the product/tile geometry —
-not just plumbing. The earlier 1.5–2 week estimate was optimistic; the kernel support is the bulk of the
-work (closer to 3–5 weeks), and it should start with a 1536 micro-benchmark before any MoE integration.
+(`evidence/fp4-hy4-1536-error.log`). I then added the 1536 quantize dispatches (`quantize_kernel<3>`
+for tokens/planes/f16); they compile, but the next step, the FP4 **gemm**, faults with
+`prefill fp4: gemm: misaligned address` (`evidence/fp4-hy4-1536-gemm-error.log`). The product/tile
+geometry is dimension-specialized as well, not only the quantizer. A Hy4 FP4 path therefore needs
+**new kernel/tile work for 1536** — the token-plane quantizer, the activation-plane quantizer, and the
+product/tile geometry — not just plumbing. The earlier 1.5–2 week estimate was optimistic; the kernel
+support is the bulk of the work (closer to 3–5 weeks), and it should start with a 1536 micro-benchmark
+before any MoE integration.
 
 **Qwen already has this**: its prompt path uses `expert_fp4.cpp`/`run_group` at 2304/2560/640, and the
 `prefill_fp4_test` above is its parity test. Nothing has to be implemented for Qwen; it is the reference
