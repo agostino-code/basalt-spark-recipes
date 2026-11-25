@@ -121,10 +121,12 @@ stage shape — **16 experts, 17,232 rows, max 11,771 per expert, R = 29,363 tok
 planes, the token/row split and the real stride/alignment are all correct. Forcing **one expert per launch**
 in the full path still dies at `prefill fp4: gemm: misaligned address`
 (`evidence/fp4-hy4-one-expert-fault.log`), and replacing its H buffer with a dedicated device
-scratch does not help (`evidence/fp4-hy4-device-h-fault.log`). With the synthetic real-shape micro
-passing, the only remaining difference is the **real expert blob data/layout or the stage copy**, not
-the buffers. The next test is to put a real pack blob into the micro (or a synthetic known blob into
-the stage); that isolates the last variable.
+scratch does not help (`evidence/fp4-hy4-device-h-fault.log`). Zeroing every staged blob before the
+FP4 product still faults (`evidence/fp4-hy4-zero-blob-fault.log`), so the **real blob data is not the
+cause** either. With the synthetic real-shape micro passing, the remaining difference is the engine's
+own stage plumbing (`B.tok`/`B.bounds`, the stage copy, or an overrun from one of the FP4 buffers),
+not the product or the blob. The next test isolates the gate/up product from the down product and
+dumps the stage tables; still local, no PR.
 
 **Qwen already has this**: its prompt path uses `expert_fp4.cpp`/`run_group` at 2304/2560/640, and the
 `prefill_fp4_test` above is its parity test. Nothing has to be implemented for Qwen; it is the reference

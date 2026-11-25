@@ -1,0 +1,31 @@
+[server] legend   pp=prompt read  tg=generation  c=cached  acc=drafts accepted  dl=tokens per window  hit=expert cache  pcie=routed experts over PCIe
+[server] hy4-flash  ctx=262144 (1048576/4 slots) batch=4 spec=6 temp=0.9 top_p=1.0
+[server] engine log: /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] ready    http://127.0.0.1:30004/v1  openai+anthropic  stats http://127.0.0.1:30004/
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=14
+[server] ram      floor 2.0 GiB of 102.9 GiB free
+[server] placed   ram 0.4GiB 0.7s
+[server] loading model weights [===========>            ]  40.3/85.5 GiB  2920 MB/s
+[server] placed   cuda0 85.2GiB 32.4s
+[server] loaded   85.5GiB 33.1s  cuda0=85.1GiB ram=0.4GiB
+[server] slots    slots 4 × 262144 ctx (slot-full-context: 1048576 each), others queue
+[server] weights  loaded, ctx=262144 images=off
+basalt: error: prefill mmq: quantize: misaligned address
+[server] warning: the engine ended (no exit status), last error in its log: basalt: error: prefill mmq: quantize: misaligned address (the next request restarts it, log /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log)
+[server] s1 done  pp=22/0c  tg=0  end=error
+[server] warning: the engine exited (code 1), last error in its log: basalt: error: prefill mmq: quantize: misaligned address, restarting it, log /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log
+[server] planning weight allocation
+[server] auto     ram-experts=0.0GB pool=14
+[server] ram      floor 2.0 GiB of 103.3 GiB free
+[server] placed   ram 0.4GiB 0.8s
+[server] loading model weights [===========>            ]  41.5/85.5 GiB  3009 MB/s
+[server] placed   cuda0 85.2GiB 32.6s
+[server] loaded   85.5GiB 33.3s  cuda0=85.1GiB ram=0.4GiB
+[server] engine running again
+[server] weights  loaded, ctx=262144 images=off
+basalt: error: prefill mmq: quantize: misaligned address
+[server] warning: the engine ended (no exit status), last error in its log: basalt: error: prefill mmq: quantize: misaligned address (the next request restarts it, log /home/pgx/.cache/basalt/9f5b71de33f93963/engine.log)
+[server] s1 done  pp=29363/0c  tg=0  end=error
+[server] stopping (Ctrl+C again to force)
+[server] stopped
