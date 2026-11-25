@@ -27,6 +27,7 @@ Checked against `main`, these are still missing and are the two patches the inst
 |---|---|---|
 | `0001-qwen-fp16-batch.patch` | FP16 K/V for Qwen's batch windows, with the 0.5.7 Q4_0 path preserved | [PR #694](https://github.com/jesdga95/basalt/pull/694) |
 | `0002-hy4-chunk-policy.patch` | 32k prompt chunks up to 128k, 16k to 262k, 8k above 262,144 per slot | [PR #695](https://github.com/jesdga95/basalt/pull/695) |
+| `0003-hy4-fp4-prompt.patch` | experimental Hy4 FP4 prompt experts (one-term W4A4), 1536×1536 prefill path | local, no PR |
 
 The old `0001-spark-sm121-fixes` patch is **gone**: its platform part is in main, and the prompt
 chunk policy is the separate patch above. The 0.5.0 tree and its measurements remain the historical

@@ -57,7 +57,7 @@ Total: the plumbing alone is ~1.5–2 weeks, but the 1536 kernel/tile support is
   H planes. The `Product` path (16 blobs) is closer to Hy4's staging; `Group` is the fallback if the
   run/piece logic is needed.
 - **Memory**: token planes (`a4`, `gs`) and H plans add a few hundred MiB at 16k rows; the prompt
-  workspace already has ~2.5 GiB of headroom after patch 0003.
+  workspace already has ~2.5 GiB of headroom after patch 0002.
 - **Quality**: two FP4 activation terms are ~8 bits; the gate is mandatory.
 - **Gain uncertain**: the expert MMQ is 19% of the prefill; an FP4 product twice as fast is ~9–10%
   before the quantizer/SwiGLU fusion, and the token-plane quantize takes some of it back.
@@ -234,8 +234,7 @@ So the one-term token path is the validated prototype: **+21 % at 33k, +12 % at 
 pair-row variant gives no quality improvement (0.22626) and is slower; the fused token path stays. The
 two-term 1536 kernel remains the only route to parity and is still broken.
 
-The local preset is [`presets/hy4-fp4.conf`](../presets/hy4-fp4.conf): it sets
-`ENV=BASALT_FP4_PROMPT=1` and needs the prototype engine
-(`BASALT_DIR=/tmp/basalt-install-test ./run.sh --preset hy4-fp4`; add `--parallel 1` for the 620k
-one-slot shape). The stock 0.5.7 build ignores the variable, so the preset only produces FP4 with the
-prototype tree or the FP4 patch.
+The preset is [`presets/hy4-fp4.conf`](../presets/hy4-fp4.conf): it sets
+`ENV=BASALT_FP4_PROMPT=1` and needs **patch 0003**, which `install-basalt.sh` applies
+(`./run.sh --preset hy4-fp4`; add `--parallel 1` for the 620k one-slot shape). On a stock 0.5.7 tree
+without the patch the variable is ignored and the normal MMQ experts run.
