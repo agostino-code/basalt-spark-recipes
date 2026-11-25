@@ -43,10 +43,11 @@ They are ports, not cherry-picks.
 
 Fork `jesdga95/basalt`, branch from `spark`, one topic per PR, each with a GB10 test record:
 
-1. **`qwen-fp16-batch`** — **opened as [PR #691](https://github.com/jesdga95/basalt/pull/691)**, rebased
-   onto 0.5.7 with the Q4_0 K/V path preserved. Tested on 2 × 262,144 and 4 × 131,072 with `--kv fp16`
-   (all slots answer), the int8 4-slot regression, and the resident-FP16 refusal. The fork PR #1 is the
-   0.5.6 reference and is superseded by this one.
+1. **`qwen-fp16-batch`** — **[PR #692](https://github.com/jesdga95/basalt/pull/692)** from
+   `agostino-code/basalt`, a clean direct fork of `jesdga95/basalt`; it supersedes the closed #691, which
+   came from a nested fork of the port. Rebased onto 0.5.7 with the Q4_0 K/V path preserved. Tested on
+   2 × 262,144 and 4 × 131,072 with `--kv fp16` (all slots answer), the int8 4-slot regression, and the
+   resident-FP16 refusal. The port PR #1 is the 0.5.6 reference and is also closed.
 2. **`hy4-sm121-nvfp4`** — tile the NVFP4 rows and test the large-prompt fault at 0.5.7 (the 0.5.7 notes
    still report it around 600K); include the ring question only if the 0.5.7 path reproduces it.
 3. **`hy4-chunk-policy`** — the 32k/8k prompt-chunk policy, with the 33k/80k prefill numbers and the
