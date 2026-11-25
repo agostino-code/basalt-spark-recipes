@@ -201,7 +201,9 @@ real but modest degradation, not parity.
 The obvious fix would be the two-term (~8-bit) activations, but at 1536 the two-term path is
 **wrong**: two-term gate/up and two-term H/down give KLD **1.775 / 1.745** and top-1 **62 %**
 (`evidence/hy4-quality-fp4-2term.log`, `hy4-quality-fp4-hybrid.log`). The micro-test pins it down:
-two-term gate/up at 1536 outputs **0** where the one-term outputs 0.871685
-(`evidence/fp4-1536-microtest-two-term.log`). So the one-term 1536 kernel is correct and the two-term
-1536 quantize/product layout is broken; it is a kernel task, not plumbing. The correct, working
-prototype is therefore the one-term one; the two-term quality path is still open.
+two-term gate/up at 1536 outputs **0** where the one-term outputs 0.871685. The two-term **quantize**
+is not the problem: the token planes it writes are non-zero (`a4x[0..15]=e1ec4719…`,
+`gsx=0.00148…` in `evidence/fp4-1536-two-term-planes.log`), but the two-term **product** still
+returns zero. So the one-term 1536 kernel is correct and the two-term 1536 GATHER/tile layout is
+broken; it is a kernel task, not plumbing. The correct, working prototype is therefore the one-term
+one; the two-term quality path is still open.
