@@ -1,65 +1,41 @@
-# The official `spark` branch as the base
+# The official main as the base
 
-The recipe was built on the third-party port `andreasknopke/basalt-arm-sm121` because upstream had no Arm64/sm_121
-support. Upstream now has an official branch for it — [`jesdga95/basalt`, branch `spark`](https://github.com/jesdga95/basalt/tree/spark)
-— and this is the base to move to and to send changes to.
+The recipe was built on the third-party port `andreasknopke/basalt-arm-sm121` because upstream had no
+Arm64/sm_121 support. Upstream now has it on `main`: the temporary `spark` branch was removed on
+2026-11-25 and its DGX Spark work landed in `jesdga95/basalt` main (the same commits rebased; the head
+is `c70e8011`, Basalt 0.5.7).
 
-## What the branch is
+The base is now **`agostino-code/basalt` main**, a direct fork of `jesdga95/basalt`, pinned at
+`c70e80118ead375dbcb37948d0cccad8937ad03a` in the installer. Nothing in this repository depends on the
+old port fork.
 
-Head at the time of writing: `f3bd352e` (2026-11-24), **Basalt 0.5.7**. The Arm64 work arrived as PR #450
-("arm64: building for Arm64 and the integrated 12.1 GPU") and follow-ups, and the branch also carries the
-0.5.7 release.
+## What main already has
 
-What it already has, checked in the source and the docs:
+- **Arm64/GB10**: `CMAKE_CUDA_ARCHITECTURES` defaults to 121 on Arm64, NEON CPU kernels, the platform
+  memory-ordering and synchronous-copy rules, `docs/arm64.md`, the `ubuntu-24.04-arm` CI.
+- **The page-cache trap fixed upstream**: `gpu_mem_info` reads the host's `MemAvailable`, so a
+  download's page cache no longer makes the planners refuse to load. The `posix_fadvise` workaround
+  in the start scripts is now harmless rather than necessary.
+- **GB10 benchmark support** and the Engram FP32 epsilon (#556).
+- **0.5.7**: batched decoding, the GPU placement settings and the model fixes of 0.5.6/0.5.7.
 
-- **Arm64/GB10 build**: `CMAKE_CUDA_ARCHITECTURES` defaults to 121 on Arm64, NEON CPU kernels, the
-  memory-ordering and synchronous-copy rules of the platform layer, `docs/arm64.md`.
-- **The page-cache trap fixed upstream**: `gpu_mem_info` reads the host's `MemAvailable`, not the driver's
-  `MemFree`, so a download's page cache no longer makes the planners refuse to load. This supersedes the
-  `posix_fadvise` workaround we carried for 0.5.0 (the start scripts can keep it harmlessly).
-- **GB10 benchmark support**: an integrated GPU row (no PCIe link or NVML power), Arm CPU naming from
-  `/proc/cpuinfo`, CI on `ubuntu-24.04-arm`.
-- **Hy4 and Qwen model code** and the Engram FP32 epsilon (#556).
-- **0.5.7 features**: batched decoding, the `gpu` / `gpu-mode` / `gpu-share` settings, and the model fixes of
-  0.5.6/0.5.7. The `.basalt` and config formats stay version 2.
+## What remains ours
 
-## What it does not have, and what of ours is still valid
+Checked against `main`, these are still missing and are the two patches the installer applies:
 
-Checked against the branch's files:
-
-| Our change | In `spark`? | Action |
+| Patch | What it does | Upstream |
 |---|---|---|
-| NVFP4 prompt rows tiled on sm_121 (`mmq_config.cuh`) | **No** — all NVFP4 rows are `stream_k = true` | Port if the prompt fault still reproduces; 0.5.7 still lists the Hy4 illegal access on prompts around 600K and more |
-| Expert ring off (Hy4, sm_121) | **No** — the ring code is present, no `BASALT_RING` guard | Test the long-prompt path on 0.5.7; the 0.5.0 ring fault may or may not reproduce |
-| Qwen batch windows with FP16 K/V | **No** — `kv_batch_refusal` is int8-only | Port the 0.5.6 version and test 2/4 slots; a self-contained PR |
-| Hy4 prompt-chunk policy (32k up to 128k, 8k above 262k per slot) | **No** — `kMaxChunk = 16384`, `kAttRows = 2048` | Port and re-measure 33k/80k and the >262k case |
-| Page-cache fadvise workaround | Superseded by `MemAvailable` | Keep in the start scripts (harmless), drop the claim from the docs on migration |
-| `BASALT_DBG_Q` diagnostics / product tags | Not needed as a patch on 0.5.7 | Re-evaluate only if debugging a new fault |
+| `0001-qwen-fp16-batch.patch` | FP16 K/V for Qwen's batch windows, with the 0.5.7 Q4_0 path preserved | [PR #694](https://github.com/jesdga95/basalt/pull/694) |
+| `0002-hy4-chunk-policy.patch` | 32k prompt chunks up to 128k, 16k to 262k, 8k above 262,144 per slot | [PR #695](https://github.com/jesdga95/basalt/pull/695) |
 
-Our three patches **do not apply** to `spark`: the 0.5.7 files changed (ring, MMQ table, QSA, chunk code).
-They are ports, not cherry-picks.
+The old `0001-spark-sm121-fixes` patch is **gone**: its platform part is in main, and the prompt
+chunk policy is the separate patch above. The 0.5.0 tree and its measurements remain the historical
+`spark-2026-11-24` tag; the installer and the appendices now label which numbers were taken on which
+base.
 
-## PR plan for the official branch
+## PR history
 
-Fork `jesdga95/basalt`, branch from `spark`, one topic per PR, each with a GB10 test record:
-
-1. **`qwen-fp16-batch`** — **[PR #692](https://github.com/jesdga95/basalt/pull/692)** from
-   `agostino-code/basalt`, a clean direct fork of `jesdga95/basalt`; it supersedes the closed #691, which
-   came from a nested fork of the port. Rebased onto 0.5.7 with the Q4_0 K/V path preserved. Tested on
-   2 × 262,144 and 4 × 131,072 with `--kv fp16` (all slots answer), the int8 4-slot regression, and the
-   resident-FP16 refusal. The port PR #1 is the 0.5.6 reference and is also closed.
-2. **`hy4-sm121-nvfp4`** — tile the NVFP4 rows and test the large-prompt fault at 0.5.7 (the 0.5.7 notes
-   still report it around 600K); include the ring question only if the 0.5.7 path reproduces it.
-3. **`hy4-chunk-policy`** — the 32k/8k prompt-chunk policy, with the 33k/80k prefill numbers and the
-   >262k stability test.
-
-The official branch was built and run on the GB10 before the PR: Hy4 4 × 262,144 loads and answers
-(a 33k prompt reads in 41.1 s at 0.5.7, against ~32–36 s on the 0.5.0 tree with the chunk policy);
-Qwen int8 4 slots answers, and `--kv fp16` with 2 slots was refused exactly as above before the patch.
-
-## Recipe migration
-
-The validated 0.5.0 tree stays the `spark-2026-11-24` tag. A migration branch would pin the official
-`spark` commit, point the installer at `jesdga95/basalt`, carry only the ported patches, rebuild for 121,
-and re-measure the presets, the four-slot behaviour and the quality gate against 0.5.7. Nothing of this
-changes the current recipe until that gate passes.
+- #691 and #692 (Qwen FP16 from the nested/clean fork, base `spark`) were closed when `spark` was
+  removed; #694 is the same change rebased onto `main`.
+- #693 (chunk policy, base `spark`) was closed the same way; #695 is the rebased one.
+- The head fork is `agostino-code/basalt`, a direct fork of `jesdga95/basalt`.

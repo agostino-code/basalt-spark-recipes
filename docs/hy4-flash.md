@@ -14,12 +14,18 @@ port's own README says it was measured on an RTX Spark N1X and that *"the DGX Sp
 generation but has not been tested"*. We tested it, found two faults that only show up on sm_121,
 fixed them far enough to run agent workloads for hours, and wrote the numbers down.
 
-**What is ours** is the fork [`andreasknopke/basalt-arm-sm121`](https://github.com/andreasknopke/basalt-arm-sm121)
-(branch `hy4-port`, pinned in the installer): it merges the upstream **v0.5.0** into yanmindi's
-Arm64/sm_121 port — that merge is where the Hy4-flash support enters the port — adds the MMQ
-read-past fix for the dense tensors, the two sm_121 prompt-fault fixes, and (one commit past the tree
-the Qwen numbers were measured on) upstream **#556**, the Engram epsilon fix, plus the crash
-reproduction, the lane configuration and the measurements below. The engine, the port and the
+> **Base change, 2026-11-25.** The installer now builds the maintained fork
+> [`agostino-code/basalt`](https://github.com/agostino-code/basalt), a direct fork of the official
+> `jesdga95/basalt`, at main `c70e8011` (0.5.7 + the DGX Spark / Arm64 support). The 0.5.0 pin
+> `f9bf55aa` and the measurements below remain the historical validation; only two patches are
+> applied now — 0001 Qwen FP16 batch, 0002 Hy4 chunk policy (PR
+> [#695](https://github.com/jesdga95/basalt/pull/695)). The re-characterisation on 0.5.7 is in
+> progress.
+
+**What is ours** is the fork [`agostino-code/basalt`](https://github.com/agostino-code/basalt)
+(main, pinned in the installer): a direct fork of the official `jesdga95/basalt`, whose main now
+carries the Arm64/sm_121 and DGX Spark support, the Engram epsilon fix, the 0.5.7 engine and the
+crash reproduction, the lane configuration and the measurements below. The engine and the models are
 model underneath stay other people's work — see [Credits](#credits). The sm_121 fixes are **workarounds, not root causes**: we know which code path
 faults and that the other one does not, not which instruction does it (see
 [Open questions](#open-questions)).
@@ -156,8 +162,8 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 | Step | What happens | Time |
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 160 GiB free for the pack | seconds |
-| 2 | clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aa`**, the commit we validated, into `basalt-port/` | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — the pinned commit carries 0001 (NVFP4 on the tiled MMQ path, expert ring off, product names in the MMQ launch errors); 0002 is Qwen-only, 0003 is the prompt-chunk policy (8k above 262,144 per slot, 32k up to 128k-token prompts, 16k above) | seconds |
+| 2 | clones `agostino-code/basalt` (main) at **`c70e80118ead375dbcb37948d0cccad8937ad03a`** into `basalt-port/` | ~1 min |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 is Qwen-only (FP16 batch), 0002 is the Hy4 prompt-chunk policy (8k above 262,144 per slot, 32k up to 128k-token prompts, 16k above) | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Hy4-flash-Basalt](https://huggingface.co/jesdga/Hy4-flash-Basalt) into `models/`, resumable and size-checked | 1–3 h |
@@ -222,15 +228,15 @@ point at a lane on a non-default port.
 | Toolchain | GCC 13.3, CMake 3.28 |
 | Model | [tencent/Hy4-flash](https://huggingface.co/tencent/Hy4-flash) — 224B total (incl. 64B Engram), 12B active, 1M context |
 | Pack | `Hy4-flash-NVFP4.basalt`, 147.8 GiB, from [jesdga/Hy4-flash-Basalt](https://huggingface.co/jesdga/Hy4-flash-Basalt) |
-| Engine | [andreasknopke/basalt-arm-sm121](https://github.com/andreasknopke/basalt-arm-sm121) — our fork (`hy4-port`) of [yanmindi/basalt-arm-sm121](https://github.com/yanmindi/basalt-arm-sm121), which is the Arm64/sm_121 port of [jesdga95/basalt](https://github.com/jesdga95/basalt); the fork merges upstream v0.5.0 and carries the fixes |
+| Engine | [agostino-code/basalt](https://github.com/agostino-code/basalt) — a direct fork of [jesdga95/basalt](https://github.com/jesdga95/basalt) at main `c70e8011` (0.5.7 + DGX Spark support); the installer applies the two remaining patches |
 
 `./install-basalt.sh --model hy4` does the following; manually it is:
 
 ```bash
-git clone https://github.com/andreasknopke/basalt-arm-sm121 basalt-port
-cd basalt-port && git checkout f9bf55aab0b507e2130db34c2463b209c319d8e2
-# the pin already carries the sm_121 patch and #556; the installer applies
-# patches/0001-spark-sm121-fixes.patch only to a tree that does not carry it
+git clone https://github.com/agostino-code/basalt basalt-port
+cd basalt-port && git checkout c70e80118ead375dbcb37948d0cccad8937ad03a
+# the installer applies patches/0001-qwen-fp16-batch.patch and
+# patches/0002-hy4-chunk-policy.patch to this pristine main
 export PATH=/usr/local/cuda/bin:$PATH CUDACXX=/usr/local/cuda/bin/nvcc
 cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121
 cmake --build build -j 4          # ~10 min for the full build

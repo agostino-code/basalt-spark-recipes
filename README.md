@@ -15,9 +15,18 @@ time.
 `qwen38-flash-next-on-spark`. Their full measured records are kept as the two per-model appendices —
 [docs/hy4-flash.md](docs/hy4-flash.md) and [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) —
 with paths and cross-repo links updated, and the Hy4 appendix's stale port pin (`df6a10cf`) corrected
-to the `f9bf55aa` this unified installer builds. This README is the shared install and the unified view.
+to the tree this unified installer builds. This README is the shared install and the unified view.
 
-What is ours is small: the fork, the three patches, the lane configuration and the measurements. The
+> **Base change, 2026-11-25.** The installer now builds the maintained fork
+> [`agostino-code/basalt`](https://github.com/agostino-code/basalt), a direct fork of the official
+> `jesdga95/basalt`, at main `c70e8011` (0.5.7 + the DGX Spark / Arm64 support that used to live in
+> the third-party port). The 0.5.0-specific sm_121 patch is gone: main has the platform support. Only
+> two patches remain — 0001 Qwen FP16 batch windows, 0002 Hy4 prompt-chunk policy. The numbers and
+> preset notes below were measured on the 0.5.0 tree and are being re-characterised on 0.5.7; the
+> upstream PRs are [#694](https://github.com/jesdga95/basalt/pull/694) (Qwen FP16) and
+> [#695](https://github.com/jesdga95/basalt/pull/695) (chunk policy).
+
+What is ours is small: the fork, the two patches, the lane configuration and the measurements. The
 engine, the port, the packs and the models are other people's work — see [Credits](#credits). The
 port's own README measures the RTX Spark N1X and lists the DGX Spark as *the same GPU generation but
 not tested*; both appendices are that validation for their pack.
@@ -32,16 +41,13 @@ not tested*; both appendices are that validation for their pack.
 * [run.sh](run.sh) — `./run.sh [--preset NAME|hy4|qwen] [server args]`, starts a lane from `basalt-port/`.
 * [presets/](presets/) — the named launch configurations: agent, fp8, two-slot, vision, single
   window; `./run.sh --list-presets` lists them.
-* [patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch) — the shared sm_121
-  patch: NVFP4 on the tiled MMQ path, the expert ring off, product names in the MMQ launch errors.
-* [patches/0002-qwen-fp16-batch.patch](patches/0002-qwen-fp16-batch.patch) — Qwen's batch windows
+* [patches/0001-qwen-fp16-batch.patch](patches/0001-qwen-fp16-batch.patch) — Qwen's batch windows
   with FP16 K/V: the segment K/V append stores the resident FP16 pools, so `--parallel` 2–4 works
-  with `--kv fp16` (streamed FP16 is refused).
-* [patches/0003-hy4-chunk-policy.patch](patches/0003-hy4-chunk-policy.patch) — the prompt-chunk policy.
-  A per-slot context above 262,144 uses 8,192-row chunks (the ~15k-row NVFP4 `moe-down` launch faults
-  on sm_121); prompts up to 131,072 tokens use 32,768 rows (33k prefill 32.4 s against 36.1 s, 80k in
-  78.8 s), and longer prompts keep 16,384 (the measured long-context numbers). About 2.5 GiB more
-  workspace, all experts resident.
+  with `--kv fp16` (streamed FP16 is refused). Rebases the 0.5.6 port onto main; PR #694.
+* [patches/0002-hy4-chunk-policy.patch](patches/0002-hy4-chunk-policy.patch) — the prompt-chunk policy:
+  32k rows up to 128k tokens, 16k up to 262k, 8k above 262,144 per slot (the NVFP4 `moe-down`
+  workaround). On 0.5.7, 33k reads in 37.6 s against 41.1 s and 71k in 89.5 s against 99.3 s (engine);
+  PR #695.
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
   concurrency ladder and the Qwen acceptance check:
   * [tools/basalt-repro.py](tools/basalt-repro.py) — deterministic Hy4 crash reproduction (`crash`, `ladder`, `pair`).
@@ -62,8 +68,8 @@ not tested*; both appendices are that validation for their pack.
   dropping the measurement base's page cache (`hy4-ram-tier-fault.log`).
 * [docs/hy4-flash.md](docs/hy4-flash.md) — the full Hy4-Flash recipe: the two sm_121 faults, the fixes,
   the benchmark tables and the credits.
-* [docs/spark-branch.md](docs/spark-branch.md) — the official `spark` branch as the base for the next
-  version, the differences from this tree and the PR plan.
+* [docs/spark-branch.md](docs/spark-branch.md) — the official main as the base: what it already has,
+  the two remaining patches and the upstream PRs.
 * [docs/qwen38-flash-next.md](docs/qwen38-flash-next.md) — the full Qwen3.8-Flash-Next recipe: the
   measured tables, the four-slot trap, the Infernix comparison and the credits.
 * `basalt-port/` — the engine tree: a gitignored working checkout of the fork, with `build/`, `.venv/`,
@@ -105,8 +111,8 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 | Step | What happens | Time |
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, free disk (160 GiB for the Hy4 pack, 130 GiB for Qwen) | seconds |
-| 2 | engine tree: clones `andreasknopke/basalt-arm-sm121` (branch `hy4-port`) at **`f9bf55aab0b507e2130db34c2463b209c319d8e2`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 is in the pinned commit, 0002 and 0003 on top | seconds |
+| 2 | engine tree: clones `agostino-code/basalt` (main) at **`c70e80118ead375dbcb37948d0cccad8937ad03a`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 Qwen FP16, then 0002 Hy4 chunk policy | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `basalt-port/.venv` and installs the pinned `requirements.txt` when the venv is missing | ~1 min |
 | 6 | downloads each selected pack into `basalt-port/models/` when it is missing or incomplete, resumable and size-checked | 1–3 h per pack |
@@ -126,7 +132,7 @@ The flags that matter:
 | `--no-smoke` | skip the smoke test |
 | `--vision` | Hy4 only: the single-slot image configuration (`--parallel 1 --max-context 262144 --fit-max-tokens --vision dynamic`); refused with `--model qwen`, applied to Hy4 only with `--model all` |
 | `--install-unit` | write the systemd `--user` unit(s) (`hy4-basalt` / `qwen-basalt`); they are left disabled on purpose |
-| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen defaults to int8 (fp16 works with patch 0002); single lane only |
+| `--kv <fmt>` | KV format; Hy4 defaults to fp16 (`fp8` halves it), Qwen defaults to int8 (fp16 works with patch 0001); single lane only |
 | `-h`, `--help` | usage |
 
 `--pack`, `--port` and `--kv` describe one lane, so the installer refuses them with `--model all`.
@@ -161,15 +167,15 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV — the measured baseline |
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV — half the KV, the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV — lower memory |
-| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV — needs patch 0003 |
-| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — needs patch 0003 |
+| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV — needs patch 0002 |
+| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — needs patch 0002 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV |
 | `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV — one full window |
-| `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV — needs patch 0002 |
-| `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV — needs patch 0002; 15.2 GiB of KV |
+| `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV — needs patch 0001 |
+| `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV — needs patch 0001; 15.2 GiB of KV |
 
 `hy4-fp8` halves the KV for +0.004 KLD and no top-1 loss; every preset's tested numbers are in
 [presets/README.md#measured](presets/README.md#measured).
@@ -183,7 +189,8 @@ the ports are shared with other lanes on our box, so an automatic start would ra
 ## What we measured
 
 Both lanes were measured on the same box: DGX Spark, GB10, 121 GiB of unified memory, Ubuntu 24.04,
-CUDA 13.0.88, Basalt 0.5.0 plus the pinned fork's sm_121 fixes and (for the Hy4 quality gate) #556.
+CUDA 13.0.88, Basalt 0.5.0 plus the pinned fork's sm_121 fixes and (for the Hy4 quality gate) #556. The
+installer now builds 0.5.7 main instead; the re-characterisation is in progress.
 The full per-depth tables, the conditions and the raw logs are in the appendices; this is the
 condensed record, with the measured figures kept exact.
 
@@ -225,65 +232,42 @@ The Infernix comparison, same model and same box, is in
 
 ## The shared engine
 
-Both lanes run the fork [`andreasknopke/basalt-arm-sm121`](https://github.com/andreasknopke/basalt-arm-sm121),
-branch `hy4-port`, pinned in the installer at `f9bf55aab0b507e2130db34c2463b209c319d8e2`. The fork
-merges upstream Basalt **v0.5.0** into yanmindi's Arm64/sm_121 port — that merge is where the
-Hy4-flash support enters the port — carries the MMQ read-past fix for the dense tensors, and adds the
-two sm_121 prompt-fault fixes. One commit past `8172978`, the tree the Qwen numbers were measured on,
-it also carries upstream **#556**, the Hy4 Engram epsilon fix: the gate norms the stream and the key
-with FP32's machine epsilon as the reference does, where bf16's 0.0078 swamped small keys and put
-stray byte tokens after a `},` line split. That commit touches Hy4 kernels only; Qwen is untouched.
-One tree, one commit, one `bin/basalt` for both models.
+Both lanes run the maintained fork [`agostino-code/basalt`](https://github.com/agostino-code/basalt),
+a direct fork of the official [`jesdga95/basalt`](https://github.com/jesdga95/basalt), pinned in the
+installer at main `c70e80118ead375dbcb37948d0cccad8937ad03a` (Basalt 0.5.7). Main carries the
+Arm64/sm_121 and DGX Spark support (the temporary `spark` branch was removed on 2026-11-25), the
+Engram FP32 epsilon (#556), the `MemAvailable` memory planning for the integrated GPU and the 0.5.7
+engine. One tree, one `bin/basalt` for both models.
 
-The patches, applied in order:
+The 0.5.0 port tree and its two sm_121 fault fixes are the **historical validation** (the
+`spark-2026-11-24` tag and the appendices): the installer no longer builds them, because main has the
+platform support and the fault workaround is now the chunk policy below.
 
-[patches/0001-spark-sm121-fixes.patch](patches/0001-spark-sm121-fixes.patch):
+The two patches still applied, in order:
 
-* **NVFP4 on the tiled MMQ path.** All 16 NVFP4 rows in `src/prefill/mmq/mmq_config.cuh` run tiled
-  (`stream_k = false`) instead of stream-k; the tiled path writes straight into `dst`, so no fixup
-  buffer is involved. This half is generic: it applies to every model whose prompt path runs NVFP4
-  expert products, Qwen included.
-* **The expert ring is off by default.** The ring in `src/models/hy4flash/session.cpp` — a ~4 GB
-  staging area — is Hy4-specific; the Qwen prompt path does not touch it. `BASALT_RING=1` turns it
-  back on for re-measuring.
-* **Product names in the MMQ launch errors** (`gemm` / `heads` / `moe-gu` / `moe-down`), with the
-  extra diagnostics behind `BASALT_DBG_Q=1`. That is how the fault was attributed to a `moe-down`
-  product.
+[patches/0001-qwen-fp16-batch.patch](patches/0001-qwen-fp16-batch.patch) — Qwen's batch windows with
+FP16 K/V. The segment K/V append (`qsa_dec_kv_post_seg`) stores into the resident FP16 pools, the
+segment attention is told the slot's format, the fused pre path runs for a resident FP16 window, and
+the batch init admits resident FP16 while refusing a streamed one. The Q4_0 path added in 0.5.7 is
+preserved. Tested on 2 × 262,144 and 4 × 131,072 (all slots answer) and on the int8 4-slot
+regression. Upstream: [PR #694](https://github.com/jesdga95/basalt/pull/694).
 
-Both sm_121 fault fixes are **workarounds, not root causes**: we know which code path faults and that
-the other one does not, not which instruction faults. Both faults are memory-layout dependent. The
-reproduction, the attribution and what remains open are in
-[docs/hy4-flash.md#the-two-sm_121-faults](docs/hy4-flash.md#the-two-sm_121-faults).
+[patches/0002-hy4-chunk-policy.patch](patches/0002-hy4-chunk-policy.patch) — the Hy4 prompt-chunk
+policy: 32,768 rows up to 128k tokens, 16,384 up to 262k, 8,192 above 262,144 per slot (the NVFP4
+`moe-down` workaround). On 0.5.7 a 33k prompt reads in 37.6 s against 41.1 s and a 71,142-token prompt
+in 89.5 s against 99.3 s (engine); two 524,288 slots read the same prompt in 104.7 s without a fault.
+0.5.7 is slower than 0.5.0 overall, so this recovers part of the regression, not all of it. Upstream:
+[PR #695](https://github.com/jesdga95/basalt/pull/695).
 
-[patches/0002-qwen-fp16-batch.patch](patches/0002-qwen-fp16-batch.patch) lifts the batch chain's INT8
-assumption for Qwen. The segment K/V append (`qsa_dec_kv_post_seg`) gains an FP16 store into the
-resident pools, the segment attention is told the slot's format (it already took both), and the batch
-init admits resident FP16, refusing a streamed FP16 cache (the pool resolve copies INT8). Two-slot
-and four-slot FP16 windows start and answer without faults, and the int8 path is unchanged. At this
-pin Qwen's batch windows are **not bitwise identical to a single-slot window**: a batch row's logits
-move by ~0.1 nats and a near-tie token can flip — the unchanged int8 batch flips it the same way, so
-the variance is the batch path's, not the new FP16 store. Use one slot when exact reproduction
-matters. Four full FP16 windows spend 30.4 GiB of KV and push ~30 GB of experts to RAM, so int8 stays
-the default shape.
-
-[patches/0003-hy4-chunk-policy.patch](patches/0003-hy4-chunk-policy.patch) is the prompt-chunk policy,
-with two ends. A per-slot context above 262,144 uses 8,192-row chunks: a ~15k-row chunk faults in the
-NVFP4 `moe-down` launch on sm_121 (`prefill mmq: moe-down` with `CUDA_LAUNCH_BLOCKING=1`; the
-unblocked tag is the sticky `quantize(gemm)`), and two 524,288-token slots or one 1,048,576 slot died
-on an 80,031-token prompt while 4 × 262,144 passed. The 80k and 200k prompts then pass on two such
-slots (140 s and 267 s) and 80k on one (139 s); the root cause is still open. At the other end,
-32,768-row chunks at up to 131,072 tokens cut the 33k prefill from 36.1 s to 32.4 s (~10%) and read
-80k in 78.8 s; longer prompts keep 16,384 rows, since attention inside a chunk is the cost there. The
-workspace grows by ~2.5 GiB; the lane still keeps every expert resident.
-
-None of the patches is upstreamed; this repository offers them as files.
+Both PRs are open; the patch files remain in this repository until they merge.
 
 ## The traps
 
-* **Page cache looks like an out-of-memory error.** The engine compares `cudaMemGetInfo` against
-  `MemFree`, and the page cache of a freshly downloaded 122.6–147.8 GiB pack counts as used. Dropping
-  it with `os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)` returns ~100 GiB instantly, without
-  root and without touching a running download. The installer does this before the smoke test.
+* **Page cache looked like an out-of-memory error on 0.5.0.** The 0.5.0 engine compared
+  `cudaMemGetInfo` against `MemFree`, and the page cache of a freshly downloaded 122.6–147.8 GiB pack
+  counted as used. Main fixes the planning with `MemAvailable`; the installer still drops the cache
+  with `os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)` before the smoke test, which is now
+  harmless.
 * **The device pool is smaller than the machine.** The GPU has no memory of its own: the firmware
   gives it a carve-out of the machine's unified memory, and the engine plans against that device
   figure, not against `free -g`. Another lane holding the GPU leaves a new engine with no memory at

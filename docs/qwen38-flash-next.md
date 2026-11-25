@@ -102,9 +102,12 @@ model's own PPL. The gate took 583 s (5.8 s per chunk).
 
 ## Install
 
-One script builds the lane with the versions this recipe pins — port commit `f9bf55aa`, one commit
-past the `8172978` these numbers were measured on (it changes Hy4 kernels only, Qwen untouched);
-CUDA 13, `CMAKE_CUDA_ARCHITECTURES=121`, the `Qwen3.8-FN-NVFP4-DQ6_K` pack (122.6 GiB):
+> **Base change, 2026-11-25.** The installer now builds `agostino-code/basalt` main `c70e8011`
+> (0.5.7 + DGX Spark); the numbers below were measured on the 0.5.0 pin `f9bf55aa`. The FP16 batch
+> patch is now 0001 and targets main (PR [#694](https://github.com/jesdga95/basalt/pull/694)).
+
+One script builds the lane with the versions this recipe pins — main commit `c70e8011`, CUDA 13,
+`CMAKE_CUDA_ARCHITECTURES=121`, the `Qwen3.8-FN-NVFP4-DQ6_K` pack (122.6 GiB):
 
 ```bash
 git clone https://github.com/agostino-code/basalt-spark-recipes
@@ -119,8 +122,8 @@ What it does, in order — every step is idempotent:
 | Step | What happens | Time |
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, 130 GiB free | seconds |
-| 2 | clones `andreasknopke/basalt-arm-sm121` at **`f9bf55aa`**, the commit we validated | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one (0001 is in the pinned commit, 0002 on top) | seconds |
+| 2 | clones `agostino-code/basalt` (main) at **`c70e8011`** | ~1 min |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one (0001 Qwen FP16, 0002 Hy4 chunk policy) | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `./.venv` and installs the pinned `requirements.txt` | ~1 min |
 | 6 | downloads the pack from [jesdga/Qwen3.8-Flash-Next-Basalt](https://huggingface.co/jesdga/Qwen3.8-Flash-Next-Basalt), resumable, size- and sha256-checked | 1–3 h |

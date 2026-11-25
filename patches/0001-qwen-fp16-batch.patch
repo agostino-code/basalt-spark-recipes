@@ -1,5 +1,5 @@
 diff --git a/include/basalt/models/qwen4exp/kernels/qsa_dec_fused.hpp b/include/basalt/models/qwen4exp/kernels/qsa_dec_fused.hpp
-index 49d234a8..024e737a 100644
+index b59f4f65..7669531d 100644
 --- a/include/basalt/models/qwen4exp/kernels/qsa_dec_fused.hpp
 +++ b/include/basalt/models/qwen4exp/kernels/qsa_dec_fused.hpp
 @@ -6,7 +6,7 @@
@@ -11,10 +11,10 @@ index 49d234a8..024e737a 100644
  #pragma once
  
  #include "basalt/models/qwen4exp/kernels/kv_stream.hpp"
-@@ -26,6 +26,7 @@ struct QsaDecKvPost {
-     const int32_t* steps = nullptr;     ///< [n][kStepCount]: each row's cell at kStepPos
-     int8_t *k_q = nullptr, *v_q = nullptr;
-     uint16_t *k_scale = nullptr, *v_scale = nullptr;
+@@ -29,6 +29,7 @@ struct QsaDecKvPost {
+     /// q4_0 K/V (`--kv q4_0`): non-null switches the append from INT8 to packed Q4_0 after the rotation, in the
+     /// same launch. Mode 0 only (the streaming copy keeps the per-token path).
+     uint8_t *k_q4 = nullptr, *v_q4 = nullptr;
 +    uint16_t *k_pool = nullptr, *v_pool = nullptr;  ///< FP16 pools when k_q is null (a resident FP16 batch window)
      const int32_t* page_table = nullptr;
      KvHostPools host;                   ///< the host copy, when the cache streams
@@ -32,8 +32,27 @@ index 09c2bf5b..71c34a18 100644
  
  /// qsa_block_scores over rows of different sequences: row r reads its slot's pooled / dead. nq <= kQsaSegMaxRows.
  void qsa_block_scores_seg(const QsaSegTable& t, const float* q_idx, const int32_t* steps, int64_t nq, int64_t max_blocks,
+diff --git a/src/models/qwen4exp/cli/kv_batch.hpp b/src/models/qwen4exp/cli/kv_batch.hpp
+index 80719841..0ad350a4 100644
+--- a/src/models/qwen4exp/cli/kv_batch.hpp
++++ b/src/models/qwen4exp/cli/kv_batch.hpp
+@@ -4,10 +4,11 @@
+ 
+ namespace basalt::models::qwen4exp::cli {
+ 
+-// Batch slots (--batch, the server's parallel) run their windows on unrotated INT8 K/V, so every other KV format is
+-// refused before the weights load. Returns the refusal, empty when `kv` runs with `batch` slots.
++// Batch slots (--batch, the server's parallel) run their windows on unrotated INT8 K/V, or on resident FP16 with
++// the FP16 segment K/V append. Every other KV format is refused before the weights load. Returns the refusal, empty
++// when `kv` runs with `batch` slots.
+ inline std::string kv_batch_refusal(const std::string& kv, int batch) {
+-    if (batch < 2 || kv == "int8") return "";
++    if (batch < 2 || kv == "int8" || kv == "fp16") return "";
+     return "--kv " + kv + " does not run with " + std::to_string(batch) +
+            " slots (--batch, the server's parallel): batch windows need --kv int8, or use one slot";
+ }
 diff --git a/src/models/qwen4exp/decode/verify/batch_sessions.cpp b/src/models/qwen4exp/decode/verify/batch_sessions.cpp
-index c52783dd..7a2f44bb 100644
+index 57ddd7a7..852ee3ae 100644
 --- a/src/models/qwen4exp/decode/verify/batch_sessions.cpp
 +++ b/src/models/qwen4exp/decode/verify/batch_sessions.cpp
 @@ -67,15 +67,20 @@ bool Verifier::init_slots(const std::vector<SessionState*>& slots, std::string&
@@ -61,10 +80,10 @@ index c52783dd..7a2f44bb 100644
      }
      const uint64_t a = ((uint64_t) S * CB * 4 + 255) & ~255ull;
 diff --git a/src/models/qwen4exp/decode/verify/record_qsa.cpp b/src/models/qwen4exp/decode/verify/record_qsa.cpp
-index 1a1544c9..dc3df577 100644
+index 57f2787b..52152e46 100644
 --- a/src/models/qwen4exp/decode/verify/record_qsa.cpp
 +++ b/src/models/qwen4exp/decode/verify/record_qsa.cpp
-@@ -45,15 +45,17 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
+@@ -45,9 +45,10 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
      // the per-token GEMVs / norms / RoPEs / copies of this layer as one launch over the window's rows each
      // - row-wise identical arithmetic
      const bool qb = n > 1 && !st.kv_q4;
@@ -76,16 +95,17 @@ index 1a1544c9..dc3df577 100644
 +    const bool fp16_batch = v_.batch_rec_ && !st.kv_int8 && st.kv_mode == 0;
 +    const bool fused_pre = (st.kv_int8 || fp16_batch) && !st.kv_rot && !st.kv_hybrid && !st.kv_q4 &&
                             qsa_dec_fused_supported(s);
-     auto kv_post_args = [&] {
-         QsaDecKvPost kp;
-         kp.kcur = v_.kcur_; kp.vcur = v_.vcur_; kp.pos_k = pos_k;
+     // --kv q4_0 in the same prelude: the rotation and the Q4_0 pack live in that launch, so the layer stops paying
+     // the per-token norm/rope, two FWHT launches, T appends and T indexer appends. Mode 0 only; a streamed q4_0
+@@ -60,6 +61,7 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
          kp.k_norm = (const float*) wkn->data; kp.steps = v_.step_;
          kp.k_q = st.k_q; kp.v_q = st.v_q; kp.k_scale = st.k_scale; kp.v_scale = st.v_scale;
+         if (st.kv_q4) { kp.k_q4 = st.k_q4; kp.v_q4 = st.v_q4; }
 +        kp.k_pool = st.k_pool; kp.v_pool = st.v_pool;
          kp.page_table = st.page_table; kp.host = st.host;
          kp.idx_raw = idx_raw; kp.idx_k_norm = (const float*) wikn->data;
          kp.tail = st.idx_tail; kp.dead = st.idx_dead; kp.pooled = st.idx_pooled; kp.block_pos = st.idx_block_pos;
-@@ -64,7 +66,7 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
+@@ -70,7 +72,7 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
      // a batch window's rows are different sequences: the per-slot pointers come from the layer's table
      const QsaSegTable seg_tab{v_.batch_rec_ ? v_.d_qslots_[(size_t) qi] : nullptr, v_.d_qrows_, v_.d_qsegs_, (int) n, (int) n};
      auto kv_post = [&](const QsaDecKvPost& a, cudaStream_t q) {
@@ -94,9 +114,9 @@ index 1a1544c9..dc3df577 100644
          else qsa_dec_kv_post(a, n, s, rope_scaling(), q);
      };
      auto q_post_args = [&] {
-@@ -253,8 +255,8 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
+@@ -261,8 +263,8 @@ bool Verifier::WindowRecorder::qsa(int64_t l, const LayerView& v, bool read_q8)
+         if (v_.batch_stream_) kv_stream_resolve_seg(seg_tab, v_.sel_, v_.step_, v_.cap_, s, cs);
          stamp(l, 12);
-         fused_gate = true;
          attn_q8 = true;
 -        qsa_dec_attn_seg(v_.qcur_, seg_tab, true, v_.sel_, v_.step_, v_.cap_, s, v_.attn_scratch_, v_.attn_, n, cs, v_.qfull_,
 -                         v_.attn32_, v_.xq_);
@@ -106,32 +126,44 @@ index 1a1544c9..dc3df577 100644
      {
          {
 diff --git a/src/models/qwen4exp/kernels/qsa_dec_fused.cu b/src/models/qwen4exp/kernels/qsa_dec_fused.cu
-index b71179b2..d14bec52 100644
+index 82f516ac..8a510d19 100644
 --- a/src/models/qwen4exp/kernels/qsa_dec_fused.cu
 +++ b/src/models/qwen4exp/kernels/qsa_dec_fused.cu
-@@ -162,7 +162,7 @@ __device__ __forceinline__ void indexer_append_row(const float* raw, int pos, co
+@@ -227,7 +227,7 @@ __device__ __forceinline__ void append_q4_row(float x, int d, long long pos, int
+ }
  
- // blocks [0, n * n_kv): row t = b / n_kv, KV head b % n_kv - K norm + RoPE, K and V appends; block n * n_kv: the
- // indexer tail snapshot and the n indexer appends in row order
+ // One block per token and KV head, followed by a block for the indexer snapshot and appends.
 -template <bool TAB>
 +template <bool TAB, bool KV8>
  __device__ __forceinline__ void kv_post_dev(const QsaDecKvPost& a, int n, int n_kv, int page_size, const RopeArgs& ra,
                                              int b) {
-     __shared__ float row[HD];
-@@ -179,9 +179,26 @@ __device__ __forceinline__ void kv_post_dev(const QsaDecKvPost& a, int n, int n_
+     __shared__ float row[2 * HD];
+@@ -242,18 +242,34 @@ __device__ __forceinline__ void kv_post_dev(const QsaDecKvPost& a, int n, int n_
+         row[d] = scale * x * a.k_norm[d];
+         __syncthreads();
          rope_row<TAB>(row, a.pos_k[t * (a.pos_stride > 0 ? a.pos_stride : n_kv) + h], d, ra);
-         const float y = row[d];
-         kp[d] = y;
--        append_q8_row(y, d, pos, h, n_kv, page_size, a.page_table, a.k_q, a.k_scale, a.host.k_q, a.host.k_scale, sums);
+-        const float k = row[d];
++        const float y = row[d];
          const float v = a.vcur[((size_t) t * n_kv + h) * HD + d];
--        append_q8_row(v, d, pos, h, n_kv, page_size, a.page_table, a.v_q, a.v_scale, a.host.v_q, a.host.v_scale, sums);
-+        if (KV8) {
+         if (a.k_q4 != nullptr) {
+-            float kv[] = {k, v};
++            float kv[] = {y, v};
+             fwht_row(kv, row, d);
+             kp[d] = kv[0];
+             append_q4_row(kv[0], d, pos, h, n_kv, page_size, a.page_table, a.k_q4, a.host.k_q4);
+             append_q4_row(kv[1], d, pos, h, n_kv, page_size, a.page_table, a.v_q4, a.host.v_q4);
++        } else if (KV8) {
++            kp[d] = y;
 +            append_q8_row(y, d, pos, h, n_kv, page_size, a.page_table, a.k_q, a.k_scale, a.host.k_q,
 +                          a.host.k_scale, sums);
 +            append_q8_row(v, d, pos, h, n_kv, page_size, a.page_table, a.v_q, a.v_scale, a.host.v_q,
 +                          a.host.v_scale, sums);
-+        } else {
+         } else {
+-            kp[d] = k;
+-            append_q8_row(k, d, pos, h, n_kv, page_size, a.page_table, a.k_q, a.k_scale, a.host.k_q, a.host.k_scale, sums);
+-            append_q8_row(v, d, pos, h, n_kv, page_size, a.page_table, a.v_q, a.v_scale, a.host.v_q, a.host.v_scale, sums);
 +            // qsa.cu's kv_append_kernel, per row: [page][kv_head][page_size][head_dim]
++            kp[d] = y;
 +            const long long page = (long long) __ldg(a.page_table + pos / page_size);
 +            if (page >= 0) {
 +                const long long rowp = (page * n_kv + h) * page_size + (pos % page_size);
@@ -143,11 +175,10 @@ index b71179b2..d14bec52 100644
 +                a.host.k_pool[rowp * HD + d] = f16_from_f32(y);
 +                a.host.v_pool[rowp * HD + d] = f16_from_f32(v);
 +            }
-+        }
+         }
          return;
      }
-     if (a.tail_snap != nullptr)
-@@ -222,27 +239,28 @@ __device__ __forceinline__ void q_post_dev(const QsaDecQPost& a, int n, int n_he
+@@ -297,27 +313,28 @@ __device__ __forceinline__ void q_post_dev(const QsaDecQPost& a, int n, int n_he
      if (d < ID) qp[d] = row[d];
  }
  
@@ -181,7 +212,7 @@ index b71179b2..d14bec52 100644
          return;
      }
      const QsaSeg sg = t.segs[b - n * n_kv];
-@@ -252,7 +270,7 @@ __global__ void __launch_bounds__(THREADS) kv_post_seg_kernel(QsaDecKvPost a, Qs
+@@ -327,7 +344,7 @@ __global__ void __launch_bounds__(THREADS) kv_post_seg_kernel(QsaDecKvPost a, Qs
      a.tail_snap = a.tail_snap != nullptr ? sl.tail_snap : nullptr;
      a.idx_raw += (size_t) sg.first * ID;
      a.steps += (size_t) sg.first * kStepCount;
@@ -190,7 +221,7 @@ index b71179b2..d14bec52 100644
  }
  
  template <bool TAB>
-@@ -296,14 +314,14 @@ void qsa_dec_kv_post(const QsaDecKvPost& a, int n, const QsaShapes& s, const Rop
+@@ -371,14 +388,14 @@ void qsa_dec_kv_post(const QsaDecKvPost& a, int n, const QsaShapes& s, const Rop
      const unsigned blocks = kv_blocks + (a.idx_raw != nullptr && a.part != 1 ? 1 : 0);
      if (blocks == 0) return;
      if (ra.rt.cos != nullptr)
@@ -208,7 +239,7 @@ index b71179b2..d14bec52 100644
      if (n <= 0) return;
      if (!qsa_dec_fused_supported(s) || rope_scaling_invalid(scaling) != nullptr || t.n_seg <= 0 || t.n_seg > n) {
          basalt::log::error("basalt", "qsa_dec_kv_post_seg: unsupported geometry, scaling or table");
-@@ -313,10 +331,17 @@ void qsa_dec_kv_post_seg(const QsaDecKvPost& a, const QsaSegTable& t, int n, con
+@@ -388,10 +405,17 @@ void qsa_dec_kv_post_seg(const QsaDecKvPost& a, const QsaSegTable& t, int n, con
      const unsigned kv_blocks = a.part == 2 ? 0u : (unsigned) (n * s.n_head_kv);
      const unsigned blocks = kv_blocks + (a.idx_raw != nullptr && a.part != 1 ? (unsigned) t.n_seg : 0u);
      if (blocks == 0) return;

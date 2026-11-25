@@ -16,9 +16,10 @@
 #
 # What it does, in order:
 #   1. checks the machine (aarch64, CUDA 13, cmake, gcc, python, free disk for packs that are missing)
-#   2. clones andreasknopke/basalt-arm-sm121 at the pinned commit we validated, or reuses --dir
-#   3. applies patches/*.patch in order (0001: the sm_121 fixes; 0002: FP16 K/V for Qwen's batch windows)
-#      only when the tree does not already carry each one
+#   2. clones the maintained fork agostino-code/basalt (a direct fork of jesdga95/basalt, DGX Spark
+#      support in main) at the pinned commit, or reuses --dir
+#   3. applies patches/*.patch in order (0001: FP16 K/V for Qwen's batch windows; 0002: the Hy4 prompt
+#      chunk policy) only when the tree does not already carry each one
 #   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing, a patch was just
 #      applied, or the binary was last built at another commit — about 10 minutes
 #   5. creates the server venv and installs the pinned requirements when .venv is missing
@@ -52,15 +53,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # --- pinned versions (the combination these recipes were measured with) -------------
-# One engine tree for both lanes: our fork (andreasknopke's Arm64/sm_121 port, with the upstream v0.5.0
-# merge that brings the Hy4-flash and Qwen3.8-Flash-Next support, the MMQ read-past fix and the two
-# sm_121 prompt-fault fixes). Same commit for both lanes — the Qwen recipe adds no engine change, only
-# a pack and a start script. One commit past 8172978, the tree the Qwen numbers were measured on: it
-# carries upstream #556, the Hy4 Engram epsilon fix (Hy4 kernels only, Qwen untouched).
-PORT_REPO="https://github.com/andreasknopke/basalt-arm-sm121.git"
-PORT_COMMIT="f9bf55aab0b507e2130db34c2463b209c319d8e2"   # branch hy4-port, 2026-11-22
-# The patches are applied in file order: 0001 is already in the pinned commit (its reverse check says
-# so), 0002 (Qwen FP16 batch windows) comes after it. A patch applied now forces a rebuild below.
+# One engine tree for both lanes: the maintained fork agostino-code/basalt, a direct fork of the
+# official jesdga95/basalt. Main has the DGX Spark / Arm64 sm_121 support that used to live in the
+# third-party port (0.5.7, the GB10 memory planning, the Engram epsilon and the Arm64 CI), so the
+# old sm_121 fixes are no longer applied as patches. Same commit for both lanes.
+PORT_REPO="https://github.com/agostino-code/basalt.git"
+PORT_COMMIT="c70e80118ead375dbcb37948d0cccad8937ad03a"   # main, 2026-11-24 (0.5.7 + DGX support)
+# The patches are applied in file order: 0001 (Qwen FP16 batch windows) on the pristine main, 0002
+# (Hy4 prompt chunk policy) after it. A patch applied now forces a rebuild below.
 
 MODEL="hy4"                                    # old muscle memory: no flag installs the Hy4 lane
 TARGET="${BASALT_DIR:-${SCRIPT_DIR}/basalt-port}"   # one engine tree serves both recipes
@@ -112,7 +112,7 @@ if [ "$MODEL" = all ]; then
        (--model hy4 --kv ... / --model qwen --kv ...)"
 fi
 # The Qwen lane is written with four full windows (1,048,576 cells). FP16 K/V works there with patch
-# 0002, but 30.4 GiB of KV pushes tens of GB of experts to RAM; int8 keeps the same windows at 15.2
+# 0001, but 30.4 GiB of KV pushes tens of GB of experts to RAM; int8 keeps the same windows at 15.2
 # GiB. Say so, and leave the choice to the caller.
 if [ "$MODEL" = "qwen" ] && [ -n "$KV" ] && [ "$KV" != "int8" ]; then
     echo "  warning: --kv $KV on the Qwen lane's four full windows needs about 30 GiB of KV and pushes
@@ -267,15 +267,15 @@ for m in $MODELS; do
 done
 
 # --- 2. the port at the pinned commit --------------------------------------------
-say 2/8 "port: andreasknopke/basalt-arm-sm121 (fork, branch hy4-port) @ ${PORT_COMMIT:0:8}"
+say 2/8 "port: agostino-code/basalt (direct fork of jesdga95/basalt, main) @ ${PORT_COMMIT:0:8}"
 if [ -d "$TARGET/.git" ]; then
     echo "  reusing $TARGET"
     # Never delete or recreate a tree: it may be the one this box was measured on, with the packs and
     # the venv already in it. Only the identity and the pin are checked.
     ORIGIN="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
     case "$ORIGIN" in
-        *basalt-arm-sm121*) : ;;
-        *) die "$TARGET is a git tree but not a checkout of basalt-arm-sm121 (origin: ${ORIGIN:-none}).
+        *agostino-code/basalt*|*jesdga95/basalt*) : ;;
+        *) die "$TARGET is a git tree but not a checkout of agostino-code/basalt (origin: ${ORIGIN:-none}).
        Point --dir at the engine tree, or move that directory away and rerun." ;;
     esac
     HEAD_SHA="$(git -C "$TARGET" rev-parse HEAD)"
@@ -294,7 +294,7 @@ echo "  at $(git -C "$TARGET" rev-parse --short HEAD) — $(git -C "$TARGET" log
 
 # --- 3. the patches ---------------------------------------------------------------
 say 3/8 "checking the patches"
-# 0001 is already in the pinned commit (the fork merge) and says so by reversing; 0002 applies on top.
+# 0001 (Qwen FP16) is the first patch on the pristine main; 0002 (Hy4 chunk policy) follows it.
 # Each file is checked and applied in name order, so a tree with 0001 and without 0002 gets 0002 only.
 PATCHED=0
 shopt -s nullglob
