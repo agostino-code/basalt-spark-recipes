@@ -43,13 +43,18 @@ They are ports, not cherry-picks.
 
 Fork `jesdga95/basalt`, branch from `spark`, one topic per PR, each with a GB10 test record:
 
-1. **`qwen-fp16-batch`** — the segment FP16 K/V append, the segment attention format, the batch init, and
-   `kv_batch_refusal` admitting resident FP16. Tested on 2 × 262,144 and 4 × 131,072; int8 regression.
-   (Our fork PR #1 is the 0.5.6 reference; close it in favour of the official one.)
+1. **`qwen-fp16-batch`** — **opened as [PR #691](https://github.com/jesdga95/basalt/pull/691)**, rebased
+   onto 0.5.7 with the Q4_0 K/V path preserved. Tested on 2 × 262,144 and 4 × 131,072 with `--kv fp16`
+   (all slots answer), the int8 4-slot regression, and the resident-FP16 refusal. The fork PR #1 is the
+   0.5.6 reference and is superseded by this one.
 2. **`hy4-sm121-nvfp4`** — tile the NVFP4 rows and test the large-prompt fault at 0.5.7 (the 0.5.7 notes
    still report it around 600K); include the ring question only if the 0.5.7 path reproduces it.
 3. **`hy4-chunk-policy`** — the 32k/8k prompt-chunk policy, with the 33k/80k prefill numbers and the
    >262k stability test.
+
+The official branch was built and run on the GB10 before the PR: Hy4 4 × 262,144 loads and answers
+(a 33k prompt reads in 41.1 s at 0.5.7, against ~32–36 s on the 0.5.0 tree with the chunk policy);
+Qwen int8 4 slots answers, and `--kv fp16` with 2 slots was refused exactly as above before the patch.
 
 ## Recipe migration
 
