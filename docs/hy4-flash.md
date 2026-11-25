@@ -91,6 +91,21 @@ the activation quantizer 9 %, the indexer 8 % (scores + select), router + SwiGLU
 and the hyper-connection kernels ~11 %. Attention + indexer + prepare are ~24 %; experts + router +
 SwiGLU ~30 %; dense + quantizer ~28 %.
 
+### The 8k cap: what was tried on 0.5.7
+
+The cap is not just conservative; a 16k chunk above 262,144 per slot was tried with the MoE launches
+already limited to 8k rows (`kLaunchRows = 8192`, which leaves the attention/dense chunk at 16k):
+
+- **16k chunk + `kLaunchRows = 8192`**, 2 × 524,288 slots, 71k prompt: `prefill mmq: quantize: an
+  illegal memory access` (the engine log, `evidence/hy4-16k-localcap-fault.log`).
+- **8k chunk + `kLaunchRows = 8192`**, same prompt: passes in 88.4 s against 88.6 s with the stock
+  `kLaunchRows = 32768` (`evidence/hy4-localcap-8k-safe.log`).
+
+So the fault follows the **16k-row prompt chunk**, not the MoE launch row count; lowering the MoE
+launch cap does not let the 8k chunk cap go. A root fix would have to address the 16k-row
+quantize/MMQ path itself (the sticky tag is `quantize`); the 8k cap remains the safe maximum, and no
+localized split was found. This is why the long 624k prompt runs at 466 tok/s.
+
 At **624k tokens** the stage split is attention/dense **999.7 s**, MoE 255.5 s, Engram 66.7 s: the
 attention/dense share grows from ~66 % at 222k to ~76 %, which is the O(n²) attention plus the 8k
 chunk cap (the 422k-token difference runs at 466 tok/s against 823 at 222k). The 620k kernel-level
