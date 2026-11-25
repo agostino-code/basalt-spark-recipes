@@ -120,10 +120,11 @@ report was not finalised (the server stopped the engine before nsys wrote the fi
 attention/ dense split at 624k is still to be measured; the stage times put attention at the top of
 the long-context list.
 A feasibility study for moving the prompt experts to the shared FP4 tensor-core module is in
-[hy4-fp4-prompt-feasibility.md](hy4-fp4-prompt-feasibility.md): the module is already in this tree and
-Qwen uses it on the same GB10; its parity test passes here and its benchmark is **1.56× the MMQ layer**
-(2.64× with the token-plane fused SwiGLU). The work is Hy4 plumbing plus the SwiGLU limit (roughly
-1.5–2 weeks), not a new kernel.
+[hy4-fp4-prompt-feasibility.md](hy4-fp4-prompt-feasibility.md): Qwen already uses it on this GB10 and
+its parity test passes here (benchmark **1.56× the MMQ layer**, 2.64× with the token-plane fused
+SwiGLU), but the module is **dimension-specialized** to 2304/2560/640. Hy4's 1536 needs new FP4
+kernel/quantize instantiations first (the first prototype exits with `1536 token columns (two
+terms)`), so this is a kernel project, not simple plumbing.
 
 Two cheap dense-path knobs were tried and rejected: 4,096-row attention steps (the doubled buffers
 ran the lane into RAM/checkpoint failures) and tiling the Q8_0 MMQ rows (about 20% slower than the

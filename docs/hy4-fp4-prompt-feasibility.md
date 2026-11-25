@@ -88,6 +88,26 @@ Its benchmark, 16,384 tokens × top 10 over 512 experts:
 The FP4-vs-MMQ relative RMS is 0.095 (gate/up) and 0.111 (down), the two-term activation rounding; the
 quality gate is still the real acceptance test. The log is `evidence/fp4-prefill-parity.log`.
 
+## The module is dimension-specialized — the Hy4 blocker
+
+The verified numbers above are for the **Qwen/Inkling dimensions**, not for Hy4. `moe_fp4.cu` dispatches
+`quantize_tokens(..., two=true)` only for `cols == 2304` (one-term: 2560 or 640), and the high-level
+`run_experts` hardcodes `kN = 2560, kFF = 640`. Hy4's latent and FF are both **1536**: the first
+prototype call exits with
+
+```
+basalt: error: prefill fp4: 1536 token columns (two terms)
+```
+
+(`evidence/fp4-hy4-1536-error.log`). A Hy4 FP4 path therefore needs **new kernel/quantize instantiations
+for 1536** — the token-plane quantizer, the activation-plane quantizer, and the product/tile geometry —
+not just plumbing. The earlier 1.5–2 week estimate was optimistic; the kernel support is the bulk of the
+work (closer to 3–5 weeks), and it should start with a 1536 micro-benchmark before any MoE integration.
+
+**Qwen already has this**: its prompt path uses `expert_fp4.cpp`/`run_group` at 2304/2560/640, and the
+`prefill_fp4_test` above is its parity test. Nothing has to be implemented for Qwen; it is the reference
+and the performance proof for the FP4 tensor cores on this box.
+
 ## Mapping to Hy4's MoE
 
 Hy4's `NativeExpertLayout` (n_embd = latent 1536, n_ff = 1536) maps directly:
