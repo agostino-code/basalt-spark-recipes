@@ -233,3 +233,9 @@ So the one-term token path is the validated prototype: **+21 % at 33k, +12 % at 
 620k**, with quality **0.22542 KLD / 85.40 % top-1** against MMQ 0.20460 / 86.22 %. The exact-SwiGLU
 pair-row variant gives no quality improvement (0.22626) and is slower; the fused token path stays. The
 two-term 1536 kernel remains the only route to parity and is still broken.
+
+The local preset is [`presets/hy4-fp4.conf`](../presets/hy4-fp4.conf): it sets
+`ENV=BASALT_FP4_PROMPT=1` and needs the prototype engine
+(`BASALT_DIR=/tmp/basalt-install-test ./run.sh --preset hy4-fp4`; add `--parallel 1` for the 620k
+one-slot shape). The stock 0.5.7 build ignores the variable, so the preset only produces FP4 with the
+prototype tree or the FP4 patch.

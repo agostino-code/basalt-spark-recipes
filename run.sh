@@ -8,9 +8,10 @@
 #   ./run.sh qwen --port 30102        # extra args go to the server
 #   ./run.sh --preset qwen-2 --port 30102
 #
-# A preset is presets/<name>.conf: MODEL and ARGS, the flags appended to the start script's
-# own. The engine tree is $BASALT_DIR when set, else ./basalt-port beside this script
-# (that is where install-basalt.sh puts it). One tree serves both packs.
+# A preset is presets/<name>.conf: MODEL and ARGS (the flags appended to the start script's
+# own) plus optional ENV lines (NAME=VALUE exported before the start). The engine tree is
+# $BASALT_DIR when set, else ./basalt-port beside this script (that is where install-basalt.sh
+# puts it). One tree serves both packs.
 set -e
 here=$(cd "$(dirname "$0")" && pwd)
 dir=${BASALT_DIR:-$here/basalt-port}
@@ -57,17 +58,33 @@ fi
 if [ -n "$preset" ]; then
     conf="$here/presets/$preset.conf"
     [ -f "$conf" ] || die "unknown preset: $preset (see --list-presets)"
-    MODEL="" ARGS=""
+    MODEL="" ARGS="" PRESET_ENV=""
     while IFS= read -r line; do
         case "$line" in ''|'#'*) continue ;; esac
         key=${line%%=*} val=${line#*=}
         case "$key" in
             MODEL) MODEL=$val ;;
             ARGS) ARGS=$val ;;
+            ENV)
+                case "$val" in
+                    *=*) PRESET_ENV="${PRESET_ENV:+$PRESET_ENV
+}$val" ;;
+                    *) die "$conf: ENV needs NAME=VALUE: $val" ;;
+                esac
+                ;;
         esac
     done < "$conf"
     [ -n "$MODEL" ] || die "$conf has no MODEL="
     model=$MODEL
+    while IFS= read -r e; do
+        [ -n "$e" ] || continue
+        case "$e" in
+            *=*) export "$e" ;;
+            *) die "$conf: bad ENV: $e" ;;
+        esac
+    done <<EOF
+$PRESET_ENV
+EOF
 fi
 model=${model:-hy4}
 

@@ -22,6 +22,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; needs patch 0002 |
 | `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; needs patch 0002 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` | image input; mutually exclusive with the four-slot shape |
+| `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts | experimental one-term W4A4; needs the FP4 engine build; quality trade, see below |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV | the measured baseline; port 30001 |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV | the largest configuration that measured cleanly |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV | one full window at a time |
@@ -32,7 +33,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 
 ## Measured
 
-All twelve presets were started on the Spark (pin `f9bf55aa` + patches 0002/0003, 2026-11-24) and answered a completion
+The twelve stock presets were started on the Spark (pin `f9bf55aa` + patches 0002/0003, 2026-11-24) and answered a completion
 (HTTP 200); the banners confirmed the shape (`kv=fp8`, two slots, `vision=gpu0`). What the variants
 cost:
 
@@ -51,17 +52,35 @@ cost:
 | `qwen` fp16 + `--kv-resident` | refused at the batch init: `a batch window's FP16 K/V must be resident (drop --kv-resident)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
 
+## Experimental FP4
+
+`hy4-fp4` enables the one-term FP4 prompt experts (W4A4) through `BASALT_FP4_PROMPT=1`. It needs the
+local prototype engine: the 0.5.7 base has no FP4 prefill path, so on a stock install the variable is
+ignored and the normal MMQ experts run. For now:
+
+```bash
+BASALT_DIR=/tmp/basalt-install-test ./run.sh --preset hy4-fp4
+BASALT_DIR=/tmp/basalt-install-test ./run.sh --preset hy4-fp4 --parallel 1   # the 620k one-slot shape
+```
+
+Measured with the prototype: 33k 24.8 s vs MMQ 31.4 s, 222k 237.5 s vs 270 s, 620k one slot
+1222.7 s vs 1325.4 s. The quality trade is real: KLD 0.22542 / top-1 85.40 % against MMQ
+0.20460 / 86.22 %. It is experimental, not the default; the two-term 1536 path that would close the
+gap is still broken (KLD 1.67-1.78 in the attempts so far).
+
 Not tested: `--route-tail-skip` / `--route-prior` (they need experts off the card; this box keeps all
 512 resident) and `--pool-workers` (only used when the CPU pool runs experts).
 
 ## Add one
 
-Create `presets/<name>.conf` with three lines (comments and blank lines are ignored):
+Create `presets/<name>.conf` with the three required lines and optional `ENV=` lines
+(comments and blank lines are ignored):
 
 ```sh
 MODEL=hy4
 DESC=what this preset is for, shown by --list-presets
 ARGS=--kv fp8 --parallel 4
+ENV=BASALT_FP4_PROMPT=1    # optional, NAME=VALUE exported before the start; repeatable
 ```
 
 `MODEL` is `hy4` or `qwen`; `ARGS` is a flag list, not a shell command — values must not contain
