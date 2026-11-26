@@ -114,3 +114,12 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
   (chunk 24/30/31), sempre dentro l'indexer.
 - Prossimo: sonde più fini dentro `indexer()` (sync+log dopo `idx_pool`, `idx_scores_rows`, `select`)
   per isolare il singolo kernel.
+
+## Round 7/8 — indexer: il blocco è scores/select (fix difensivo in prova)
+
+- Sonde `idx_pool` / `idx_sel`: lo stall arriva **dopo `idx_pool`** e prima di `idx_sel` → il blocco è
+  la seconda parte dell'indexer (`idx_scores_rows` / `idx_select_rows`), non il compressore.
+- Fix difensivo nel `select_kernel`: inizializzazione di `sh_prefix`/`sh_rem` prima dei pass (evita
+  shared stale se un pass non trova bin) e guardia `b > 0` nel loop del prefisso (evita l'indice -1).
+- Sonda `idx_scores` (sync dopo gli scores) aggiunta: il run con il fix dirà se il blocco è
+  `scores_mma_kernel` o `select_kernel`.
