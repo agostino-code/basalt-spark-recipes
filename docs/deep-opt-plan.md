@@ -123,3 +123,13 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
   shared stale se un pass non trova bin) e guardia `b > 0` nel loop del prefisso (evita l'indice -1).
 - Sonda `idx_scores` (sync dopo gli scores) aggiunta: il run con il fix dirà se il blocco è
   `scores_mma_kernel` o `select_kernel`.
+
+## Round 10 — ring: 341,7 s di streaming esperti
+
+- `t_ring_ms_` **341,7 s** a 620k (8k, 1 slot); ~6,4 TB di esperti (512 × 41 layer × 78 chunk × 4 MB)
+  → **~18,7 GB/s** effettivi. Il `ring_copy` usa già `cudaMemcpy2DAsync` per i run contigui (`gap` =
+  blob), quindi il collo è il bus/DMA, non l'issue delle copie.
+- Seconda card **0 righe**, pool CPU **0**: tutto passa dalla card e il ring è sul percorso critico
+  (la `st` attende `ring_copied_[slot]`).
+- Leve: esperti residenti (slot HBM), seconda card, layout pack, pool CPU; l'8k non cambia il plateau
+  di streaming.
