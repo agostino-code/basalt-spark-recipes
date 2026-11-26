@@ -63,3 +63,14 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
   2048 (era rimasto 4096 da un test precedente, senza effetto sullo stall).
 - La sequenza di layer 0 è `ring_ahead → engram → attention → ffn`; il prossimo run con la
   strumentazione fine individua il kernel. Il loop resta lento (~10 min, posizione variabile).
+
+## Diagnosi 16k — round 2
+
+- Strumentazione fine nel `moe_prompt` (`moe_start`/`moe_router`/`moe_sync`): lo hang è **dentro
+  `ffn(l)` → `moe_prompt(l)`, prima della `moe_sync` finale** (run reale: `ffn(3)` a pos 442 368, nessun
+  `moe_sync l3`).
+- `moe_prompt` ha due sync: il primo `cudaStreamSynchronize(st)` (attende lo stream dell'attention del
+  layer) e la `moe_sync` finale. Il prossimo run pulito (in corso) distingue il primo sync (→ attention)
+  dal launch/down.
+- Il commento del codice sul "moe-down" riguarda il fault con `kLaunchRows=8192`, non questo stall: lo
+  stall 620k è nel percorso `ffn`/`moe_prompt`/attention, non il down.
