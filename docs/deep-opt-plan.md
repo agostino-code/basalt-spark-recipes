@@ -53,3 +53,13 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
 - Tutto su `deep-opt`; `main` resta lo stato validato.
 - Ogni modifica: misura 33k/222k/620k + quality gate + PR.
 - Niente costanti kernel cieche senza il redesign smem/bank-conflict.
+
+## Diagnosi 16k — round 1 (in corso)
+
+- Il 16k a 620k è uno **hang non deterministico** nel prompt stage: tre run si sono fermati al chunk
+  24 (393 216), 30 (491 520) e 31 (507 904) — sempre a un confine di chunk (multipli di 16 384),
+  sempre a **layer 0** del chunk in corso.
+- Strumentazione `[DEBUG-stall]` aggiunta nel layer loop (`ring / attn / ffn`); `kAttRows` riportato a
+  2048 (era rimasto 4096 da un test precedente, senza effetto sullo stall).
+- La sequenza di layer 0 è `ring_ahead → engram → attention → ffn`; il prossimo run con la
+  strumentazione fine individua il kernel. Il loop resta lento (~10 min, posizione variabile).
