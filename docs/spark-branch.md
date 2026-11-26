@@ -21,12 +21,11 @@ old port fork.
 
 ## What remains ours
 
-These are the four patches the installer applies, with their upstream state:
+These are the patches the installer applies, with their upstream state (the chunk policy is merged into the pinned main):
 
 | Patch | What it does | Upstream |
 |---|---|---|
 | `0001-qwen-fp16-batch.patch` | FP16 K/V for Qwen's batch windows, with the 0.5.7 Q4_0 path preserved | [PR #694](https://github.com/jesdga95/basalt/pull/694) (open; the `qwen4exp_kv_batch_test` wording fix is pushed) |
-| `0002-hy4-chunk-policy.patch` | 32k prompt chunks up to 128k, 16k to 262k, 8k above 262,144 per slot | [PR #695](https://github.com/jesdga95/basalt/pull/695) (**merged**) |
 | `0003-hy4-fp4-prompt.patch` | experimental Hy4 FP4 prompt experts (one-term W4A4), 1536×1536 prefill path | [PR #793](https://github.com/jesdga95/basalt/pull/793) (draft, experimental) |
 | `0004-qsa-seg-parity-int8.patch` | the `qsa_seg_parity` CI fix (the `int8` argument); lets the full build pass | part of [PR #694](https://github.com/jesdga95/basalt/pull/694) |
 
@@ -41,5 +40,6 @@ base.
   removed; #694 is the same change rebased onto `main`.
 - #693 (chunk policy, base `spark`) was closed the same way; #695 is the rebased one.
 - The head fork is `agostino-code/basalt`, a direct fork of `jesdga95/basalt`.
-- #695 (**merged**) carried 0002; #694 (open) carries 0001 and the `qsa_seg_parity` fix (0004);
-  #793 (draft) carries 0003, the experimental one-term FP4 prompt path.
+- #695 (**merged**) carried the chunk policy, now in the pinned main (no 0002 patch); #694 (open)
+  carries 0001 and the `qsa_seg_parity` fix (0004); #793 (draft) carries 0003, the experimental
+  one-term FP4 prompt path.

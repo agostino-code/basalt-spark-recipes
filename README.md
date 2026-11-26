@@ -21,7 +21,8 @@ to the tree this unified installer builds. This README is the shared install and
 > [`agostino-code/basalt`](https://github.com/agostino-code/basalt), a direct fork of the official
 > `jesdga95/basalt`, at main `c70e8011` (0.5.7 + the DGX Spark / Arm64 support that used to live in
 > the third-party port). The 0.5.0-specific sm_121 patch is gone: main has the platform support. Only
-> two patches remain — 0001 Qwen FP16 batch windows, 0002 Hy4 prompt-chunk policy. The 0.5.7 base
+> 0001 (Qwen FP16 batch) and the experimental 0003 (Hy4 FP4) remain as patches; the Hy4 chunk policy
+> is in main via #695. The 0.5.7 base
 > was validated on the GB10: 33k **31,4 s**, 71k **77,5 s**, 222k **270 s** (0.5.0: 32,4 / 78,8 /
 > 292), the 100-chunk gate **17,6184 PPL / 0,20460 KLD / 86,22 % top-1**, all 12 measured presets (and the experimental YaRN one) and both
 > installer smokes pass, and a **624.830-token prompt** completes in 1325 s with no illegal access
@@ -47,10 +48,7 @@ not tested*; both appendices are that validation for their pack.
 * [patches/0001-qwen-fp16-batch.patch](patches/0001-qwen-fp16-batch.patch) — Qwen's batch windows
   with FP16 K/V: the segment K/V append stores the resident FP16 pools, so `--parallel` 2–4 works
   with `--kv fp16` (streamed FP16 is refused). Rebases the 0.5.6 port onto main; PR #694.
-* [patches/0002-hy4-chunk-policy.patch](patches/0002-hy4-chunk-policy.patch) — the prompt-chunk policy:
-  32k rows up to 128k tokens, 16k up to 262k, 8k above 262,144 per slot (the NVFP4 `moe-down`
-  workaround). On 0.5.7, 33k reads in 37.6 s against 41.1 s and 71k in 89.5 s against 99.3 s (engine);
-  PR #695.
+* the Hy4 prompt-chunk policy (32k/16k/8k) is **in main** via PR #695 — no patch.
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
   concurrency ladder and the Qwen acceptance check:
   * [tools/basalt-repro.py](tools/basalt-repro.py) — deterministic Hy4 crash reproduction (`crash`, `ladder`, `pair`).
@@ -115,7 +113,7 @@ What it does, in order — every step is idempotent, so rerunning it after a fai
 |---|---|---|
 | 1 | machine checks: aarch64, CUDA 13, cmake >= 3.24, gcc >= 13, python >= 3.11, free disk (160 GiB for the Hy4 pack, 130 GiB for Qwen) | seconds |
 | 2 | engine tree: clones `agostino-code/basalt` (main) at **`c70e80118ead375dbcb37948d0cccad8937ad03a`** into `basalt-port/` (or `--dir`), or reuses the checkout already there | ~1 min |
-| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 Qwen FP16, then 0002 Hy4 chunk policy | seconds |
+| 3 | applies `patches/*.patch` in order when the tree does not already carry each one — 0001 Qwen FP16, 0003 Hy4 FP4, 0004 the parity CI fix | seconds |
 | 4 | builds it when `bin/basalt` is missing or was last built at another commit, `-DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=121` | ~10 min |
 | 5 | creates `basalt-port/.venv` and installs the pinned `requirements.txt` when the venv is missing | ~1 min |
 | 6 | downloads each selected pack into `basalt-port/models/` when it is missing or incomplete, resumable and size-checked | 1–3 h per pack |
@@ -170,8 +168,8 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV — the measured baseline |
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV — half the KV, the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV — lower memory |
-| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV — needs patch 0002 |
-| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — needs patch 0002 |
+| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV — chunk policy in main |
+| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — chunk policy in main |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` |
 | `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts — experimental; needs patch 0003 (PR #793) |
 | `hy4-fp4-1m` | Hy4 | 1 slot × 1,048,576, FP4 prompt experts — experimental; needs patch 0003 |
@@ -226,7 +224,7 @@ and [issue #13](https://github.com/andreasknopke/codec-reverse-bench-leaderboard
 | Decode | **56.7–57.7 tok/s at every depth measured** (63.6k, 185.6k, 252.4k); 68.9 at 4k |
 | Context per request | **262,144-token window** (prompt + answer); a 252,425-token prompt answers correctly and the server reports `ctx=262144 images=off` |
 | KV | **int8, 15.2 GiB for four windows** (elastic, `1.5/15.2GiB` at start, ~15.5 KB per token) |
-| KV (fp16) | patch 0002: 15.2 GiB for two 262,144-token windows, or four 131,072-token ones; four full 262,144 windows need 30.4 GiB |
+| KV (fp16) | in main: 15.2 GiB for two 262,144-token windows, or four 131,072-token ones; four full 262,144 windows need 30.4 GiB |
 | Quality | **PPL 3.3032 ± 0.0436** (base 3.2733), **KLD mean 0.06246**, **same top-1 91.68 %** — the pack card's 3.304 / 0.0624 / 91.65 % reproduced |
 | Four full windows | **does not hold on this box**: four 252,010-token sessions took **621.7 s** wall, TTFT 187–620 s, decode 0.4–34.9 tok/s, almost 8 GB of swap in use |
 | Stability | 0 engine faults in ~25 requests, including the acceptance ladder and the full-window runs |
@@ -258,12 +256,12 @@ the batch init admits resident FP16 while refusing a streamed one. The Q4_0 path
 preserved. Tested on 2 × 262,144 and 4 × 131,072 (all slots answer) and on the int8 4-slot
 regression. Upstream: [PR #694](https://github.com/jesdga95/basalt/pull/694).
 
-[patches/0002-hy4-chunk-policy.patch](patches/0002-hy4-chunk-policy.patch) — the Hy4 prompt-chunk
-policy: 32,768 rows up to 128k tokens, 16,384 up to 262k, 8,192 above 262,144 per slot (the NVFP4
-`moe-down` workaround). On 0.5.7 a 33k prompt reads in 37.6 s against 41.1 s and a 71,142-token prompt
-in 89.5 s against 99.3 s (engine); two 524,288 slots read the same prompt in 104.7 s without a fault.
-0.5.7 is slower than 0.5.0 overall, so this recovers part of the regression, not all of it. Upstream:
-[PR #695](https://github.com/jesdga95/basalt/pull/695).
+The Hy4 prompt-chunk policy (32,768 rows up to 128k tokens, 16,384 up to 262k, 8,192 above 262,144
+per slot, the NVFP4 `moe-down` workaround) is **in the pinned main** via
+[PR #695](https://github.com/jesdga95/basalt/pull/695) (no patch). On 0.5.7 a 33k prompt reads in
+37.6 s against 41.1 s and a 71,142-token prompt in 89.5 s against 99.3 s (engine); two 524,288 slots
+read the same prompt in 104.7 s without a fault. 0.5.7 is slower than 0.5.0 overall, so this recovers
+part of the regression, not all of it.
 
 Both PRs are open; the patch files remain in this repository until they merge.
 

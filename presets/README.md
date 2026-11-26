@@ -19,8 +19,8 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `hy4-agent` | Hy4 | 4 slots × 262,144, fp16 KV | the measured agent baseline; port 30000 |
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV | half the KV (~15 → ~8.7 GiB), the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV | lower memory, shorter queue |
-| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; needs patch 0002 |
-| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; needs patch 0002 |
+| `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; chunk policy in main |
+| `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; chunk policy in main |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` | image input; mutually exclusive with the four-slot shape |
 | `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts | experimental one-term W4A4; needs patch 0003; quality trade, see below |
 | `hy4-fp4-1m` | Hy4 | 1 slot × 1,048,576, FP4 prompt experts | experimental one-term W4A4; needs patch 0003; the full 1M window |
@@ -45,11 +45,11 @@ cost:
 | `qwen-2` under load | two ~89k-token prompts at once: both completed, 90.2 s wall, TTFT 42.9 / 51.9 s. |
 | `--spec` on Hy4 | 4 is worse (struct 33.0 vs 39.4 tok/s); 8 is level with 6 (39.3 / 19.3 vs 39.4 / 19.6). Keep 6. |
 | `qwen --kv k8v4` / `q4_0` | accepted at one slot and answered; not quality-measured, and not tried at four slots. |
-| `qwen` fp16 batch (patch 0002) | two slots and four slots × 131,072 start, answer and show no faults; four full 262,144-token fp16 windows also start and answer, but take 30.4 GiB of KV. |
+| `qwen` fp16 batch (patch 0001) | two slots and four slots × 131,072 start, answer and show no faults; four full 262,144-token fp16 windows also start and answer, but take 30.4 GiB of KV. |
 | `qwen` batch numerics | the slots are not bitwise against a one-slot window: the same greedy prompt moves a row's logits by ~0.1 nats and a near-tie token can flip. The unchanged int8 batch does the same, so it is the 0.5.0 batch path, not the FP16 store; one slot for exact reproduction. |
 | `qwen` int8 regression | the unchanged int8 batch path with two slots still answers. |
-| `hy4-2x524` / `hy4-1m` (patch 0002) | an 80k-token prompt passes on both (2 × 524,288: 200, 140 s; 1 × 1,048,576: 200, 139 s); 2 × 524,288 also passes 200k tokens (200, 267 s). A full 524k/1M prompt is not measured. |
-| Hy4 prefill (patch 0002) | 33k tokens in 32.4 s against 36.1 s with 16k chunks (~10%), 80k in 78.8 s; the 16k depth is unchanged and prompts above 128k keep 16,384-row chunks. |
+| `hy4-2x524` / `hy4-1m` (in main) | an 80k-token prompt passes on both (2 × 524,288: 200, 140 s; 1 × 1,048,576: 200, 139 s); 2 × 524,288 also passes 200k tokens (200, 267 s). A full 524k/1M prompt is not measured. |
+| Hy4 prefill (in main) | 33k tokens in 32.4 s against 36.1 s with 16k chunks (~10%), 80k in 78.8 s; the 16k depth is unchanged and prompts above 128k keep 16,384-row chunks. |
 | `qwen` fp16 + `--kv-resident` | refused at the batch init: `a batch window's FP16 K/V must be resident (drop --kv-resident)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
 

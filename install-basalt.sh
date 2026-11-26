@@ -18,9 +18,9 @@
 #   1. checks the machine (aarch64, CUDA 13, cmake, gcc, python, free disk for packs that are missing)
 #   2. clones the maintained fork agostino-code/basalt (a direct fork of jesdga95/basalt, DGX Spark
 #      support in main) at the pinned commit, or reuses --dir
-#   3. applies patches/*.patch in order (0001: FP16 K/V for Qwen's batch windows; 0002: the Hy4 prompt
-#      chunk policy; 0003: the experimental Hy4 FP4 prompt experts) only when the tree does not already
-#      carry each one
+#   3. applies patches/*.patch in order (0001: FP16 K/V for Qwen's batch windows; 0003: the
+#      experimental Hy4 FP4 prompt experts; 0004: the qsa_seg_parity CI fix) only when the tree does not
+#      already carry each one
 #   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing, a patch was just
 #      applied, or the binary was last built at another commit — about 10 minutes
 #   5. creates the server venv and installs the pinned requirements when .venv is missing
@@ -59,9 +59,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # third-party port (0.5.7, the GB10 memory planning, the Engram epsilon and the Arm64 CI), so the
 # old sm_121 fixes are no longer applied as patches. Same commit for both lanes.
 PORT_REPO="https://github.com/agostino-code/basalt.git"
-PORT_COMMIT="c70e80118ead375dbcb37948d0cccad8937ad03a"   # main, 2026-11-24 (0.5.7 + DGX support)
-# The patches are applied in file order: 0001 (Qwen FP16 batch windows) on the pristine main, 0002
-# (Hy4 prompt chunk policy) after it. A patch applied now forces a rebuild below.
+PORT_COMMIT="c771c0a78176e7bb9800a8ba4b19836bdb69a229"   # main, 2026-11-25 (0.5.7 + the merged #695 chunk policy)
+# The patches are applied in file order: 0001 (Qwen FP16 batch windows) on the pinned main, 0003 (the
+# Hy4 FP4 prompt path) and 0004 (the parity CI fix) after it. A patch applied now forces a rebuild below.
 
 MODEL="hy4"                                    # old muscle memory: no flag installs the Hy4 lane
 TARGET="${BASALT_DIR:-${SCRIPT_DIR}/basalt-port}"   # one engine tree serves both recipes

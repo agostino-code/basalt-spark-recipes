@@ -17,10 +17,10 @@ fixed them far enough to run agent workloads for hours, and wrote the numbers do
 > **Base change, 2026-11-25.** The installer now builds the maintained fork
 > [`agostino-code/basalt`](https://github.com/agostino-code/basalt), a direct fork of the official
 > `jesdga95/basalt`, at main `c70e8011` (0.5.7 + the DGX Spark / Arm64 support). The 0.5.0 pin
-> `f9bf55aa` and the measurements below remain the historical validation; only two patches are
-> applied now — 0001 Qwen FP16 batch, 0002 Hy4 chunk policy (PR
-> [#695](https://github.com/jesdga95/basalt/pull/695), merged)). The re-characterisation on 0.5.7 is in
-> progress.
+> `f9bf55aa` and the measurements below remain the historical validation; 0001 (Qwen FP16) and 0003
+> (Hy4 FP4, draft) are the patches applied now, 0004 is the parity CI fix; the Hy4 chunk policy is in
+> the pinned main via [#695](https://github.com/jesdga95/basalt/pull/695). The re-characterisation on
+> 0.5.7 is in progress.
 
 **What is ours** is the fork [`agostino-code/basalt`](https://github.com/agostino-code/basalt)
 (main, pinned in the installer): a direct fork of the official `jesdga95/basalt`, whose main now
