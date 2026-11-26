@@ -96,3 +96,10 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
 - Hy4 attention: il kernel `attend_mma` ha `n`/`__syncthreads` uniformi (nessuna divergenza); il 16k
   (8 step di attention vs 4 dell'8k) alza la probabilità di una race. Prossimo: `nsys`/sanitizer o un
   contatore di progresso kernel per isolare `mla_prepare`/`indexer`/`mla_attend`.
+
+## Round 5 — Qwen 524k int8: validato
+
+- `run.sh --preset qwen-yarn-524` (int8): `ctx=524288 kv=int8`, KV `0.7/7.8 GiB` (vs ~15 GiB fp16).
+- Prompt **480,052 token**: **HTTP 200**, prefill **270,7 s (1774 t/s)**, TTFT 270,8 s, 1 token
+  (`end=length`); RAM available 17 GiB dopo, **nessun** RAM critical.
+- Il limite RAM >262k è superato: il fix `--kv int8` è verificato end-to-end.
