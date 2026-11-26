@@ -56,7 +56,7 @@ cost:
 ## Experimental FP4
 
 `hy4-fp4` enables the one-term FP4 prompt experts (W4A4) through `BASALT_FP4_PROMPT=1` and
-**patch 0003** (the FP4 prompt path; `install-basalt.sh` applies it). On a 0.5.7 tree without the
+**patch 0003** (the FP4 prompt path; `install-basalt.sh` applies it; [PR #793](https://github.com/jesdga95/basalt/pull/793), draft). On a 0.5.7 tree without the
 patch the variable is ignored and the normal MMQ experts run.
 
 ```bash

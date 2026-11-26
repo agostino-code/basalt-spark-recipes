@@ -26,8 +26,8 @@ to the tree this unified installer builds. This README is the shared install and
 > 292), the 100-chunk gate **17,6184 PPL / 0,20460 KLD / 86,22 % top-1**, all 12 measured presets (and the experimental YaRN one) and both
 > installer smokes pass, and a **624.830-token prompt** completes in 1325 s with no illegal access
 > (the 8k cap). The 0.5.0 tables in the appendices remain the historical record. Upstream:
-> [#694](https://github.com/jesdga95/basalt/pull/694) and
-> [#695](https://github.com/jesdga95/basalt/pull/695).
+> [#694](https://github.com/jesdga95/basalt/pull/694) (open) and
+> [#695](https://github.com/jesdga95/basalt/pull/695) (merged).
 
 What is ours is small: the fork, the two patches, the lane configuration and the measurements. The
 engine, the port, the packs and the models are other people's work — see [Credits](#credits). The
@@ -173,7 +173,7 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV — needs patch 0002 |
 | `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV — needs patch 0002 |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` |
-| `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts — experimental; needs patch 0003 |
+| `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts — experimental; needs patch 0003 (PR #793) |
 | `hy4-fp4-1m` | Hy4 | 1 slot × 1,048,576, FP4 prompt experts — experimental; needs patch 0003 |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV — the measured baseline |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV — the largest clean configuration |

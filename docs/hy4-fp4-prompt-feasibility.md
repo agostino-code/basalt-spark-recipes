@@ -235,6 +235,6 @@ pair-row variant gives no quality improvement (0.22626) and is slower; the fused
 two-term 1536 kernel remains the only route to parity and is still broken.
 
 The preset is [`presets/hy4-fp4.conf`](../presets/hy4-fp4.conf): it sets
-`ENV=BASALT_FP4_PROMPT=1` and needs **patch 0003**, which `install-basalt.sh` applies
+`ENV=BASALT_FP4_PROMPT=1` and needs **patch 0003** ([PR #793](https://github.com/jesdga95/basalt/pull/793), draft), which `install-basalt.sh` applies
 (`./run.sh --preset hy4-fp4`; add `--parallel 1` for the 620k one-slot shape). On a stock 0.5.7 tree
 without the patch the variable is ignored and the normal MMQ experts run.

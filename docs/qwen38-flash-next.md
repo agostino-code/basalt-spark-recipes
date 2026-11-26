@@ -104,7 +104,7 @@ model's own PPL. The gate took 583 s (5.8 s per chunk).
 
 > **Base change, 2026-11-25.** The installer now builds `agostino-code/basalt` main `c70e8011`
 > (0.5.7 + DGX Spark); the numbers below were measured on the 0.5.0 pin `f9bf55aa`. The FP16 batch
-> patch is now 0001 and targets main (PR [#694](https://github.com/jesdga95/basalt/pull/694)).
+> patch is now 0001 and targets main (PR [#694](https://github.com/jesdga95/basalt/pull/694), open).
 
 One script builds the lane with the versions this recipe pins — main commit `c70e8011`, CUDA 13,
 `CMAKE_CUDA_ARCHITECTURES=121`, the `Qwen3.8-FN-NVFP4-DQ6_K` pack (122.6 GiB):

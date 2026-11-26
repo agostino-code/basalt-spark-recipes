@@ -19,7 +19,7 @@ fixed them far enough to run agent workloads for hours, and wrote the numbers do
 > `jesdga95/basalt`, at main `c70e8011` (0.5.7 + the DGX Spark / Arm64 support). The 0.5.0 pin
 > `f9bf55aa` and the measurements below remain the historical validation; only two patches are
 > applied now — 0001 Qwen FP16 batch, 0002 Hy4 chunk policy (PR
-> [#695](https://github.com/jesdga95/basalt/pull/695)). The re-characterisation on 0.5.7 is in
+> [#695](https://github.com/jesdga95/basalt/pull/695), merged)). The re-characterisation on 0.5.7 is in
 > progress.
 
 **What is ours** is the fork [`agostino-code/basalt`](https://github.com/agostino-code/basalt)
