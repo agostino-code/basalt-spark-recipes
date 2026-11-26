@@ -74,3 +74,15 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
   dal launch/down.
 - Il commento del codice sul "moe-down" riguarda il fault con `kLaunchRows=8192`, non questo stall: lo
   stall 620k è nel percorso `ffn`/`moe_prompt`/attention, non il down.
+
+## Diagnosi 16k — round 3 (concluso: è l'attention)
+
+- Il run pulito `debug4` conferma: lo hang è tra `moe_start l6` e `moe_router l6` = il **primo
+  `cudaStreamSynchronize(st)`** di `moe_prompt`, che attende lo stream dell'**attention** del layer.
+- Quindi lo stall 16k/620k è un **hang GPU nei kernel dell'attention** (`attention_step` →
+  `mla_prepare` / `indexer` / `mla_attend`), non il moe-down, non il ring, non i buffer, non il host.
+- La posizione è non deterministica (chunk 1, 24, 26, 30) ma sempre dentro l'attention; coerente con il
+  `kMmaCells=64` che rompeva l'engine (il kernel `attend_mma` è fragile).
+- La strumentazione host è esaurita (tutti i kernel sono accodati prima della sync): il prossimo passo
+  è `compute-sanitizer`/`nsys` o un contatore di progresso dentro i kernel per individuare quale
+  (`mla_prepare`/`indexer`/`mla_attend`) pende.
