@@ -86,3 +86,13 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
 - La strumentazione host è esaurita (tutti i kernel sono accodati prima della sync): il prossimo passo
   è `compute-sanitizer`/`nsys` o un contatore di progresso dentro i kernel per individuare quale
   (`mla_prepare`/`indexer`/`mla_attend`) pende.
+
+## Round 4 — Qwen >262k: preset int8 (validazione in corso)
+
+- `qwen-yarn-524` usava `--kv fp16` (~15 GiB di KV a 524k) e scavalcava l'`--kv int8` dello start:
+  il RAM guard fermava le richieste >262k ("other programs took ~12.8 GiB").
+- Corretto a **`--kv int8`** (~7.6 GiB): commit `390d703`. Validazione in corso: server 524k int8
+  avviato (ram-experts 16.2 GB, pool 14), prompt 524k; atteso il completamento senza RAM critical.
+- Hy4 attention: il kernel `attend_mma` ha `n`/`__syncthreads` uniformi (nessuna divergenza); il 16k
+  (8 step di attention vs 4 dell'8k) alza la probabilità di una race. Prossimo: `nsys`/sanitizer o un
+  contatore di progresso kernel per isolare `mla_prepare`/`indexer`/`mla_attend`.
