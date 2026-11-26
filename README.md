@@ -179,7 +179,7 @@ Presets are named flag sets for those same start scripts ([presets/](presets/), 
 | `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV — one full window |
 | `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV — needs patch 0001 |
 | `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV — needs patch 0001; 15.2 GiB of KV |
-| `qwen-yarn-524` | Qwen | 1 slot × 524,288, fp16 KV, YaRN ×2 — experimental, twice the native 262,144 window |
+| `qwen-yarn-524` | Qwen | 1 slot × 524,288, int8 KV, YaRN ×2 — experimental, twice the native 262,144 window |
 
 `hy4-fp8` halves the KV for +0.004 KLD and no top-1 loss; every preset's tested numbers are in
 [presets/README.md#measured](presets/README.md#measured).

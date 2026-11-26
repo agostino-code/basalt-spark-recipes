@@ -30,7 +30,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `qwen-fp16` | Qwen | 1 slot × 262,144, fp16 KV | one full window in fp16 |
 | `qwen-fp16-2` | Qwen | 2 slots × 262,144, fp16 KV | two full windows in fp16; needs patch 0001 |
 | `qwen-fp16-4` | Qwen | 4 slots × 131,072, fp16 KV | four windows in fp16 at int8's KV size; needs patch 0001 |
-| `qwen-yarn-524` | Qwen | 1 slot × 524,288, fp16 KV, YaRN ×2 | experimental: twice the native 262,144 window; check long-context quality before trusting it |
+| `qwen-yarn-524` | Qwen | 1 slot × 524,288, int8 KV, YaRN ×2 | experimental: twice the native 262,144 window; int8 KV (~7.6 GiB) avoids the RAM guard at 524k; check long-context quality |
 
 ## Measured
 

@@ -41,7 +41,7 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
 
 ### 1. Contesti >262k (RAM guard)
 - 524k fp16 KV ~15 GB + modello 123 GB su HBM 121 + altri programmi → `RAM critical 808 MiB`.
-- Fix: `--kv int8`/`nvfp4` (preset), liberare RAM; il preset `qwen-yarn-524` forza `--kv fp16` (da correggere).
+- Fix: `--kv int8`/`nvfp4` (preset), liberare RAM; il preset `qwen-yarn-524` è stato corretto a `--kv int8` (~7.6 GiB di KV invece di ~15 GiB).
 
 ### 2. FP16 batch (PR #694)
 - Il segment FP16 append; parity bitwise; manca il benchmark con power label (bot).
