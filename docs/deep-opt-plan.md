@@ -103,3 +103,14 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
 - Prompt **480,052 token**: **HTTP 200**, prefill **270,7 s (1774 t/s)**, TTFT 270,8 s, 1 token
   (`end=length`); RAM available 17 GiB dopo, **nessun** RAM critical.
 - Il limite RAM >262k è superato: il fix `--kv int8` è verificato end-to-end.
+
+## Round 6 — l'hang è l'indexer della QSA
+
+- Sonde con sync dopo ogni fase dell'attention (`mla_prepare` / `indexer` / `mla_attend`): lo stall è
+  ora a **`attn_prepare l0 pos 497664` senza `attn_indexer`** → il blocco è nell'**indexer** (i kernel
+  della QSA indexer: `gemm` / `idx_pool` / `idx_scores_rows` / `select`), non in `mla_prepare` né in
+  `mla_attend`.
+- Le sonde (sync) spostano il punto di hang ma non lo eliminano: la posizione resta non deterministica
+  (chunk 24/30/31), sempre dentro l'indexer.
+- Prossimo: sonde più fini dentro `indexer()` (sync+log dopo `idx_pool`, `idx_scores_rows`, `select`)
+  per isolare il singolo kernel.
