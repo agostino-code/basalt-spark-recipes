@@ -276,6 +276,16 @@ if [ -d "$TARGET/.git" ]; then
     ORIGIN="$(git -C "$TARGET" remote get-url origin 2>/dev/null || true)"
     case "$ORIGIN" in
         *agostino-code/basalt*|*jesdga95/basalt*) : ;;
+        *andreasknopke/basalt-arm-sm121*)
+            # The early arm-sm121 fork: same packs and venv, but not the maintained main.  Re-point
+            # and reset to the pin; the ignored models/, .venv/ and the untracked start scripts stay,
+            # the tracked changes of the old fork are discarded.
+            echo "  legacy arm-sm121 tree: re-pointing origin to agostino-code/basalt and resetting to ${PORT_COMMIT:0:8}"
+            echo "  models/, .venv/ and the start scripts are kept; tracked changes of the old fork are discarded"
+            git -C "$TARGET" remote set-url origin "$PORT_REPO"
+            git -C "$TARGET" fetch --quiet --no-tags origin "$PORT_COMMIT"                 || die "cannot fetch ${PORT_COMMIT:0:8} in $TARGET"
+            git -C "$TARGET" reset --hard --quiet "$PORT_COMMIT"
+            ;;
         *) die "$TARGET is a git tree but not a checkout of agostino-code/basalt (origin: ${ORIGIN:-none}).
        Point --dir at the engine tree, or move that directory away and rerun." ;;
     esac
