@@ -133,3 +133,10 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
   (la `st` attende `ring_copied_[slot]`).
 - Leve: esperti residenti (slot HBM), seconda card, layout pack, pool CPU; l'8k non cambia il plateau
   di streaming.
+
+## Round 13 — guardia cells: negativa
+
+- Guardia `if (slot < k)` sull'output del `select_kernel` compilata e provata: lo stall **persiste**
+  (`idx_scores l41 pos 487424`, nessun `idx_sel`). La scrittura OOB di `cells` **non** è la causa.
+- Prossimo: `cuda-gdb` attach sul processo bloccato (`info cuda kernels`) o
+  `compute-sanitizer --tool synccheck` per il deadlock del `select_kernel`.
