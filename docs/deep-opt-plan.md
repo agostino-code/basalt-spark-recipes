@@ -308,3 +308,30 @@ Le due strade rimaste, fuori dal budget di questo ciclo:
    di `--vram-reserve-mib`), così 512 slot → 269 slot liberano ~37 GiB per il KV;
 2. rendere bounded il reclaim del tier (`ExpertTier::reclaim` / `cache_.grow`) con un timeout o un
    conteggio dei tentativi, e mappare il fallimento su `Refused`.
+
+## Round 20 — il punto esatto (traccia per layer) e il tetto a ~300k
+
+Traccia env-gated (`BASALT_TRACE=1`, rimossa dopo la diagnosi) su chunk, layer, passo e fase: il blocco
+cade in **`attn 0` → fase `cells`** del primo layer del chunk, cioè nella scrittura delle righe di cache
+e nel `put_i32(meta_d_, meta, 4*arows_)` che porta `cudaStreamSynchronize` sul percorso del prompt.
+Provato a togliere quello staging (copia diretta dal buffer pinned per-layer/per-step, `meta_h_`):
+**nessun guadagno misurabile** (605–610 t/s contro 605–622) e il tetto resta — modifica ritirata.
+
+Misurato che il tetto **non dipende dalla lunghezza del prompt**: un prompt da 400k muore a ~295k token
+come il 620k. Il processo termina senza messaggio ("the engine ended (no exit status), nothing in its
+log") con il pool a ~117/121 GiB: è la fine della memoria, non un errore CUDA riportabile.
+
+**Patch e preset aggiornati a questo stato:**
+
+- `patches/0001-qwen-fp16-batch.patch` — sorgenti Qwen (rigenerata dal working tree);
+- `patches/0003-hy4-fp4-prompt.patch` — percorso FP4 di Hy4 (`session.cpp`, `indexer.cu`, `moe_fp4`);
+- `patches/0004-qsa-seg-parity-int8.patch` — test di parità (rigenerata);
+- **nuova** `patches/0005-hy4-serve-prompt-fixes.patch` — `checkpoint_mount` che ripristina la storia dei
+  token, read interrotto che chiude la richiesta come `cancelled`, upload della tabella rotary da memoria
+  mappata. Tutte e quattro verificate con `git apply --reverse --check` sul working tree.
+- `presets/hy4-fp4-1m.conf` — corretto il dato irreperibile "620k = 1222,7 s", aggiunti i numeri misurati
+  (33k: 45,7 s) e il tetto di memoria; `--kv fp8` documentato come opzione per prompt più lunghi.
+- `install-basalt.sh` — commento dei passi aggiornato con la 0005.
+
+**Stato finale:** 33k HTTP 200 in 45,7 s con tutte le patch applicate; >262k non raggiungibile su questa
+macchina per memoria. Qwen PR #1 resta il deliverable validato.

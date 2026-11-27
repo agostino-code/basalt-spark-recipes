@@ -1,5 +1,5 @@
 diff --git a/include/basalt/prefill/moe_fp4.hpp b/include/basalt/prefill/moe_fp4.hpp
-index ecf3d3b..1d4ebaa 100644
+index ecf3d3b0..1d4ebaab 100644
 --- a/include/basalt/prefill/moe_fp4.hpp
 +++ b/include/basalt/prefill/moe_fp4.hpp
 @@ -82,6 +82,7 @@ struct Product {
@@ -10,8 +10,21 @@ index ecf3d3b..1d4ebaa 100644
      bool two = false;   ///< the activations as two FP4 terms (quantize's `two`: planes of 2 * w_cols values a row)
  };
  void run(const Product& p, void* stream);
+diff --git a/src/models/hy4flash/kernels/indexer.cu b/src/models/hy4flash/kernels/indexer.cu
+index d30ac893..c84a8eb3 100644
+--- a/src/models/hy4flash/kernels/indexer.cu
++++ b/src/models/hy4flash/kernels/indexer.cu
+@@ -272,7 +272,7 @@ __global__ void select_kernel(const float* __restrict__ scores, int n, int k, in
+         bool take = key > thr;
+         if (key == thr) take = tie_before++ < need;
+         if (take) {
+-            for (int j = 0; j < pool; ++j) cells[(size_t) slot * pool + j] = i * pool + j;
++            if (slot < k) for (int j = 0; j < pool; ++j) cells[(size_t) slot * pool + j] = i * pool + j;
+             ++slot;
+         }
+     }
 diff --git a/src/models/hy4flash/session.cpp b/src/models/hy4flash/session.cpp
-index 90f0892..6e3ab4d 100644
+index 3c188a11..748fb729 100644
 --- a/src/models/hy4flash/session.cpp
 +++ b/src/models/hy4flash/session.cpp
 @@ -30,6 +30,7 @@
@@ -22,6 +35,20 @@ index 90f0892..6e3ab4d 100644
  #include "basalt/log.hpp"
  #include "basalt/model/batch_driver.hpp"
  #include "basalt/platform/compiler.hpp"
+@@ -66,11 +67,11 @@ namespace {
+ namespace bk = basalt::kernels;
+ 
+ constexpr int kRowWidth = 576;                 // a cache row: 512 latent values and 64 rotated
+-constexpr int kMaxChunk = 16384;               // rows a prompt chunk may carry (the residual streams and the experts' pairs)
++constexpr int kMaxChunk = 32768;               // rows a prompt chunk may carry (the residual streams and the experts' pairs)
+ constexpr int kAttRows = 2048;                 // rows of one attention step inside a chunk (the rings are sized for it)
+ constexpr int kStageExperts = 16;              // experts of one prompt launch (a blob each in the staging)
+ constexpr int kMmqTile = 128;                  // the widest column tile of an MMQ product
+-constexpr int kLaunchRows = 16384;              // most (row, expert) pairs of one prompt launch
++constexpr int kLaunchRows = 32768;              // most (row, expert) pairs of one prompt launch
+ constexpr int kMaxWindow = 8;                  // rows of a decode window, and of one expert group
+ constexpr int kRawRing = kAttRows + 16;        // the indexer's rows of the last positions (a multiple of the pool size)
+ constexpr int64_t kGrowPositions = 16384;      // positions the caches are backed in
 @@ -108,6 +109,10 @@ struct Bufs {
      int32_t *icells = nullptr, *meta_d = nullptr, *meta_h = nullptr, *ids = nullptr, *pair_map = nullptr, *pair_ident = nullptr,
              *mmq_ident = nullptr;
@@ -33,7 +60,20 @@ index 90f0892..6e3ab4d 100644
      void release() {
          for (void* p : dev) cudaFree(p);
          for (void* p : host) cudaFreeHost(p);
-@@ -416,6 +421,16 @@ public:
+@@ -219,6 +224,12 @@ public:
+                 pinned_.push_back(stage_h_);
+                 if (cudaHostGetDevicePointer((void**) &stage_d_, stage_h_, 0) != cudaSuccess) ok = false;
+             }
++            // the rope table of a whole chunk, mapped: a kernel reads it, so the upload never waits on a copy engine
++            if (cudaHostAlloc((void**) &rope_tab_h_, (size_t) kMaxChunk * 3 * 4, kMapped) != cudaSuccess) ok = false;
++            else {
++                pinned_.push_back(rope_tab_h_);
++                if (cudaHostGetDevicePointer((void**) &rope_tab_d_, rope_tab_h_, 0) != cudaSuccess) ok = false;
++            }
+         }
+         rope_dev_ = (int32_t*) alloc((size_t) ctx * 12, ok);   // [vision] the 3-D rotary position of every cell
+         stride_ = m_.expert_stride();
+@@ -416,6 +427,16 @@ public:
                  b.mmq_xq = q;
              }
          }
@@ -50,7 +90,7 @@ index 90f0892..6e3ab4d 100644
          if (!ok) {
              b.release();
              cudaGetLastError();   // a smaller try must not find this failed allocation as the last error of its first launch
-@@ -441,6 +456,8 @@ public:
+@@ -441,6 +462,8 @@ public:
          icells_ = b.icells; meta_d_ = b.meta_d; meta_h_ = b.meta_h; gu_ = b.gu; h_ = b.h; rlog_ = b.rlog; rw_ = b.rw; ids_ = b.ids;
          xlat_ = b.xlat; lat_out_ = b.lat_out; moe_out_ = b.moe_out; sh_ = b.sh; erows_ = b.erows; ekv_ = b.ekv; evalid_ = b.evalid;
          pair_rows_ = b.pair_rows; pair_map_ = b.pair_map; pair_ident_ = b.pair_ident; mmq_ident_ = b.mmq_ident; mmq_xq_ = b.mmq_xq;
@@ -59,7 +99,7 @@ index 90f0892..6e3ab4d 100644
          h_erows_ = b.h_erows; h_e_ = b.h_e; h_evalid_ = b.h_evalid;
      }
  
-@@ -2243,6 +2260,7 @@ private:
+@@ -2240,6 +2263,7 @@ private:
      // gate/up product, the clamped SwiGLU and the down product, and a pair's output row is kept for the weighted sum.
      bool moe_prompt(int l, int tl, int R, const kernels::NativeExpertLayout& lay, std::string& err) {
          namespace mmq = basalt::prefill::mmq;
@@ -67,7 +107,7 @@ index 90f0892..6e3ab4d 100644
          const int K = g_.n_used, L = g_.n_latent, F = g_.n_ff_exp;
          const ExpertLayer& el = m_.pack().experts[(size_t) l];
          if (!mmq::fits(el.gu_type, 2 * F) || !mmq::fits(el.d_type, L)) {
-@@ -2252,6 +2270,8 @@ private:
+@@ -2249,6 +2273,8 @@ private:
          if (loaded_.insert({el.gu_type, 2 * F}).second) mmq::load(el.gu_type, 2 * F);
          if (loaded_.insert({el.d_type, L}).second) mmq::load(el.d_type, L);
          cudaStream_t st = stream_;
@@ -76,7 +116,7 @@ index 90f0892..6e3ab4d 100644
          std::vector<int32_t> hid((size_t) R * K);
          const double t0 = now_ms();
          cudaStreamSynchronize(st);
-@@ -2325,6 +2345,28 @@ private:
+@@ -2322,6 +2348,28 @@ private:
                            const std::vector<int32_t>& bounds) {
              put_i32(B.tok, tok.data(), tok.size());
              put_i32(B.bounds, bounds.data(), bounds.size());
@@ -105,7 +145,17 @@ index 90f0892..6e3ab4d 100644
              mmq::quantize(xlat_, B.tok, xq1_, el.gu_type, L, L, rows, st);
              mmq::Product p;
              p.w = blobs;
-@@ -3002,6 +3044,10 @@ private:
+@@ -2906,7 +2954,8 @@ private:
+         std::vector<int32_t> tab;
+         const int64_t from = was_on ? pos0 : 0;
+         for (int64_t c = from; c < pos0 + R; ++c) tab.insert(tab.end(), {rope_.at(c).t, rope_.at(c).h, rope_.at(c).w});
+-        cudaMemcpyAsync(rope_dev_ + from * 3, tab.data(), tab.size() * 4, cudaMemcpyHostToDevice, stream_);
++        std::memcpy(rope_tab_h_, tab.data(), tab.size() * 4);
++        bk::copy_i32x3_from_mapped(rope_dev_ + from * 3, rope_tab_d_, (int64_t) tab.size(), nullptr, nullptr, 0, nullptr, nullptr, 0, stream_);
+         cudaStreamSynchronize(stream_);   // the host table is a temporary
+     }
+ 
+@@ -2999,8 +3048,13 @@ private:
      int32_t* pos_h_ = nullptr;   // its pinned host copy (a window ends synchronized, so the last copy has read it)
      void* attw_ = nullptr;   // the chunked attention's workspace
      int cells_stride_ = 0, rows_ = 0, arows_ = 0, steps_ = 0, max_heads_ = 0;
@@ -115,9 +165,12 @@ index 90f0892..6e3ab4d 100644
 +    int32_t *fp4_rel_ = nullptr, *fp4_toh_ = nullptr;
      static constexpr size_t kStageInts = (size_t) 4 << 20;   // the mapped staging of a prompt's small inputs
      int32_t *stage_h_ = nullptr, *stage_d_ = nullptr, *bounds_tab_ = nullptr;
++    int32_t *rope_tab_h_ = nullptr, *rope_tab_d_ = nullptr;   // mapped: a chunk's rope table, read by a kernel
      size_t stage_at_ = 0;
+     Bufs big_;   // a window's row buffers, and a prompt chunk's while one runs
+     float *gu_ = nullptr, *h_ = nullptr, *rlog_ = nullptr, *rw_ = nullptr;
 diff --git a/src/prefill/moe_fp4.cu b/src/prefill/moe_fp4.cu
-index 44cc6d3..6823f02 100644
+index 44cc6d3f..6823f021 100644
 --- a/src/prefill/moe_fp4.cu
 +++ b/src/prefill/moe_fp4.cu
 @@ -363,6 +363,7 @@ struct GemmArgs {

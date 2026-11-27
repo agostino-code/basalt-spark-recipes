@@ -19,8 +19,10 @@
 #   2. clones the maintained fork agostino-code/basalt (a direct fork of jesdga95/basalt, DGX Spark
 #      support in main) at the pinned commit, or reuses --dir
 #   3. applies patches/*.patch in order (0001: FP16 K/V for Qwen's batch windows; 0003: the
-#      experimental Hy4 FP4 prompt experts; 0004: the qsa_seg_parity CI fix) only when the tree does not
-#      already carry each one
+#      experimental Hy4 FP4 prompt experts; 0004: the qsa_seg_parity CI fix; 0005: the Hy4 serve fixes —
+#      a mounted checkpoint restores its token history, a stopped prompt read ends the request as
+#      cancelled instead of decoding past it, and the chunk's rope table uploads from mapped memory) only
+#      when the tree does not already carry each one
 #   4. builds it (Release, CMAKE_CUDA_ARCHITECTURES=121) when bin/basalt is missing, a patch was just
 #      applied, or the binary was last built at another commit — about 10 minutes
 #   5. creates the server venv and installs the pinned requirements when .venv is missing
