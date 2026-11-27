@@ -180,3 +180,23 @@ multipli di 16.384, sempre a inizio layer / `moe_start` del primo layer del chun
 24,8 s registrato prima non è riproducibile qui, quindi quel dato veniva da un albero/binario diverso
 (probabilmente pre-patch 0004 o con chunk 32k disponibili). Da rimisurare sull'albero ripristinato
 insieme a 222k/620k prima di aggiornare la tabella delle prestazioni.
+
+## Round 15 — 32k chunk: RAM critical a ~164k, e un errore di checkpoint separato
+
+Con `kMaxChunk/kLaunchRows = 32768` (il resto ripristinato) il 620k **non** arriva in fondo, per due
+motivi distinti dal cap:
+
+1. **RAM critical a metà prefill**: a `pp=163840` il motore logga
+   `RAM critical: 1017 MiB free, hard floor 1024 MiB` (poi 963 MiB). Il chunk da 32k chiede un
+   footprint KV/esperti che su questa macchina (85,1 GiB di esperti in VRAM, 113 GiB di RAM) sfonda il
+   floor: è coerente con la scelta validata degli **8192 righe**, che è quella che arriva a 600k.
+2. **`a checkpoint past the session's position`**, non deterministico: un run si è fermato con
+   HTTP 500 a `pp=65536` al confine di una parte (`part_checkpoint(to)` vero per
+   `to == turn_at|root_at|media_at`), un altro ha superato 65536 e 163840 senza errore. Il
+   salvataggio chiede `pos` > `hist_.size()` in `running_state()`: va strumentato `checkpoint_at(to)`
+   con `to` e `hist_.size()` e un timeout di richiesta più lungo, perché serve arrivare al confine di
+   parte che lo scatena.
+
+**Stato del deliverable:** la configurazione validata (8192 righe) resta l'unica che porta i 620k in
+fondo; il percorso 16k/32k è una regressione nota e revertita. Il PR Qwen #1 (kv int8, 480.052 token,
+270,7 s) resta il risultato validato.
