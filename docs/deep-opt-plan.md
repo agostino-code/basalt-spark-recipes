@@ -337,3 +337,21 @@ log") con il pool a ~117/121 GiB: è la fine della memoria, non un errore CUDA r
 
 **Stato finale:** 33k HTTP 200 in 45,7 s con tutte le patch applicate; >262k non raggiungibile su questa
 macchina per memoria. Qwen PR #1 resta il deliverable validato.
+
+## Round 21 — migrazione al pin c771c0a7 e patch rigenerate
+
+Il port era rimasto a `c70e8011` e `install-basalt.sh` non poteva fare il checkout del pin con le
+modifiche locali in `session.cpp`/`session_engine.cpp`. Le patch sono state riportate sul pin con un
+merge a tre vie e rigenerate **contro `c771c0a7`**:
+
+- `0001` e `0004` (Qwen) applicano invariate;
+- `0003` (Hy4 FP4 prompt) assorbe anche l'upload mappato della tabella rotary; le mie costanti
+  `kMaxChunk`/`kLaunchRows` sono sparite dal diff perché **#695 le ha già upstream** (32k fino a 128k,
+  8k sopra 262k per slot);
+- `0005` (serve) si riduce a due fix: `checkpoint_mount` che ripristina la storia dei token e una
+  lettura interrotta che chiude la richiesta come `cancelled`. La mia guardia `rows_read` era
+  ridondante: il pin fa avanzare `at` solo se non è stato fermato (`if (!runtime_.halted()) at = end`).
+
+Verifica: le quattro patch applicate in ordine a un worktree pulito al pin riproducono il working tree
+(diff vuoto su `src/`, `include/`, `tests/`); `./install-basalt.sh` completa gli 8 passi, costruisce il
+binario per `c771c0a7` e passa lo smoke test. 33k sul build installato: **HTTP 200 in 46,0 s (656 t/s)**.

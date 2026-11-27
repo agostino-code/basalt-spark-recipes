@@ -24,7 +24,7 @@ index d30ac893..c84a8eb3 100644
          }
      }
 diff --git a/src/models/hy4flash/session.cpp b/src/models/hy4flash/session.cpp
-index 3c188a11..748fb729 100644
+index 6ef15ce9..ccd3bedf 100644
 --- a/src/models/hy4flash/session.cpp
 +++ b/src/models/hy4flash/session.cpp
 @@ -30,6 +30,7 @@
@@ -35,20 +35,6 @@ index 3c188a11..748fb729 100644
  #include "basalt/log.hpp"
  #include "basalt/model/batch_driver.hpp"
  #include "basalt/platform/compiler.hpp"
-@@ -66,11 +67,11 @@ namespace {
- namespace bk = basalt::kernels;
- 
- constexpr int kRowWidth = 576;                 // a cache row: 512 latent values and 64 rotated
--constexpr int kMaxChunk = 16384;               // rows a prompt chunk may carry (the residual streams and the experts' pairs)
-+constexpr int kMaxChunk = 32768;               // rows a prompt chunk may carry (the residual streams and the experts' pairs)
- constexpr int kAttRows = 2048;                 // rows of one attention step inside a chunk (the rings are sized for it)
- constexpr int kStageExperts = 16;              // experts of one prompt launch (a blob each in the staging)
- constexpr int kMmqTile = 128;                  // the widest column tile of an MMQ product
--constexpr int kLaunchRows = 16384;              // most (row, expert) pairs of one prompt launch
-+constexpr int kLaunchRows = 32768;              // most (row, expert) pairs of one prompt launch
- constexpr int kMaxWindow = 8;                  // rows of a decode window, and of one expert group
- constexpr int kRawRing = kAttRows + 16;        // the indexer's rows of the last positions (a multiple of the pool size)
- constexpr int64_t kGrowPositions = 16384;      // positions the caches are backed in
 @@ -108,6 +109,10 @@ struct Bufs {
      int32_t *icells = nullptr, *meta_d = nullptr, *meta_h = nullptr, *ids = nullptr, *pair_map = nullptr, *pair_ident = nullptr,
              *mmq_ident = nullptr;
@@ -99,7 +85,7 @@ index 3c188a11..748fb729 100644
          h_erows_ = b.h_erows; h_e_ = b.h_e; h_evalid_ = b.h_evalid;
      }
  
-@@ -2240,6 +2263,7 @@ private:
+@@ -2249,6 +2272,7 @@ private:
      // gate/up product, the clamped SwiGLU and the down product, and a pair's output row is kept for the weighted sum.
      bool moe_prompt(int l, int tl, int R, const kernels::NativeExpertLayout& lay, std::string& err) {
          namespace mmq = basalt::prefill::mmq;
@@ -107,7 +93,7 @@ index 3c188a11..748fb729 100644
          const int K = g_.n_used, L = g_.n_latent, F = g_.n_ff_exp;
          const ExpertLayer& el = m_.pack().experts[(size_t) l];
          if (!mmq::fits(el.gu_type, 2 * F) || !mmq::fits(el.d_type, L)) {
-@@ -2249,6 +2273,8 @@ private:
+@@ -2258,6 +2282,8 @@ private:
          if (loaded_.insert({el.gu_type, 2 * F}).second) mmq::load(el.gu_type, 2 * F);
          if (loaded_.insert({el.d_type, L}).second) mmq::load(el.d_type, L);
          cudaStream_t st = stream_;
@@ -116,7 +102,7 @@ index 3c188a11..748fb729 100644
          std::vector<int32_t> hid((size_t) R * K);
          const double t0 = now_ms();
          cudaStreamSynchronize(st);
-@@ -2322,6 +2348,28 @@ private:
+@@ -2331,6 +2357,28 @@ private:
                            const std::vector<int32_t>& bounds) {
              put_i32(B.tok, tok.data(), tok.size());
              put_i32(B.bounds, bounds.data(), bounds.size());
@@ -145,17 +131,17 @@ index 3c188a11..748fb729 100644
              mmq::quantize(xlat_, B.tok, xq1_, el.gu_type, L, L, rows, st);
              mmq::Product p;
              p.w = blobs;
-@@ -2906,7 +2954,8 @@ private:
+@@ -2921,7 +2969,8 @@ private:
          std::vector<int32_t> tab;
-         const int64_t from = was_on ? pos0 : 0;
+         tab.reserve((size_t) (pos0 + R - from) * 3);
          for (int64_t c = from; c < pos0 + R; ++c) tab.insert(tab.end(), {rope_.at(c).t, rope_.at(c).h, rope_.at(c).w});
 -        cudaMemcpyAsync(rope_dev_ + from * 3, tab.data(), tab.size() * 4, cudaMemcpyHostToDevice, stream_);
 +        std::memcpy(rope_tab_h_, tab.data(), tab.size() * 4);
 +        bk::copy_i32x3_from_mapped(rope_dev_ + from * 3, rope_tab_d_, (int64_t) tab.size(), nullptr, nullptr, 0, nullptr, nullptr, 0, stream_);
          cudaStreamSynchronize(stream_);   // the host table is a temporary
+         rope_uploaded_ = pos0 + R;
      }
- 
-@@ -2999,8 +3048,13 @@ private:
+@@ -3015,8 +3064,13 @@ private:
      int32_t* pos_h_ = nullptr;   // its pinned host copy (a window ends synchronized, so the last copy has read it)
      void* attw_ = nullptr;   // the chunked attention's workspace
      int cells_stride_ = 0, rows_ = 0, arows_ = 0, steps_ = 0, max_heads_ = 0;

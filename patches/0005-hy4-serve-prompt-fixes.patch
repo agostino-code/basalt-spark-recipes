@@ -15,10 +15,10 @@ index 3bcb2a0e..7082c0de 100644
      }
      if (const Flow flow = prompt_end(); flow != Flow::proceed) return flow;
 diff --git a/src/program/serve/session_engine.cpp b/src/program/serve/session_engine.cpp
-index 88c8499c..e582229e 100644
+index 1365f43c..e17b43bc 100644
 --- a/src/program/serve/session_engine.cpp
 +++ b/src/program/serve/session_engine.cpp
-@@ -601,8 +601,18 @@ private:
+@@ -629,8 +629,18 @@ private:
      bool release_room() override { return true; }
      bool checkpoint_mount(const ConvCheckpoint& c) override {
          const basalt::model::Result r = rt_.restore_running_from(c.state_a, (int64_t) c.ids.size());
@@ -39,40 +39,3 @@ index 88c8499c..e582229e 100644
      }
      Flow set_sampling() override {
          hist_n = req_sp.penalty_last_n;
-@@ -614,6 +624,7 @@ private:
-         return Flow::proceed;
-     }
-     Flow read_to(int64_t to) override;
-+    int64_t rows_read = 0;   // the last row a prefill pass reported, so a stopped read does not save past it
-     Flow slot_bind() override { rt_.set_active(slot_b); return Flow::proceed; }
-     // a slot's prompt lookup history: the conversation, then the token its first window feeds
-     void slot_init(BSlot& sl) override {
-@@ -731,6 +742,7 @@ Flow SessionRequest::prepare_image() {
- 
- // Positions at..to: text through the model's prompt path, pictures as rows, then the checkpoint of a turn or root part.
- Flow SessionRequest::read_to(int64_t to) {
-+    rows_read = at;   // the floor: a part that needs no rows is complete
-     if (at == read_from)
-         for (next_block_ = 0; next_block_ < blocks_.size() && blocks_[next_block_].at < at;) ++next_block_;
-     while (at < to) {
-@@ -750,7 +762,11 @@ Flow SessionRequest::read_to(int64_t to) {
-             pr.rows_after = to - end;
-             pr.more = end < n - 1;
-             const int64_t base = at;
--            pr.progress = [this, base](int k) { progress_line("PP", base + k); basalt::core::progress_beat(); };
-+            pr.progress = [this, base](int k) {
-+                rows_read = base + k;
-+                progress_line("PP", base + k);
-+                basalt::core::progress_beat();
-+            };
-             pr.live = [this, base](int k) {
-                 basalt::core::progress_beat();
-                 const double ms = std::chrono::duration<double, std::milli>(Clock::now() - r0).count();
-@@ -776,6 +792,7 @@ Flow SessionRequest::read_to(int64_t to) {
-         if (runtime_.halted()) { cancelled = true; return Flow::quit; }
-         progress_line("PP", at);
-     }
-+    if (rows_read < to) return Flow::quit;   // the read stopped early (a cancel): no checkpoint past where it got to
-     if (part_checkpoint(to) &&
-         !rt_.checkpoint_at(to, to == root_at ? ConvCheckpoint::kRoot : ConvCheckpoint::kTurnEnd, ids)) {
-         std::printf("ERR saving a conversation checkpoint failed: %s\n", runtime_.err.c_str());

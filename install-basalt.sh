@@ -307,8 +307,9 @@ echo "  at $(git -C "$TARGET" rev-parse --short HEAD) — $(git -C "$TARGET" log
 
 # --- 3. the patches ---------------------------------------------------------------
 say 3/8 "checking the patches"
-# 0001 (Qwen FP16) is the first patch on the pristine main; 0002 (Hy4 chunk policy) follows it.
-# Each file is checked and applied in name order, so a tree with 0001 and without 0002 gets 0002 only.
+# 0001 (Qwen FP16) is the first patch on the pristine main; then 0003 (Hy4 FP4 prompt), 0004 (the
+# qsa_seg_parity test fix) and 0005 (the Hy4 serve fixes). Each file is checked and applied in name
+# order, so a tree that carries only some of them gets the missing ones.
 PATCHED=0
 shopt -s nullglob
 PATCHES=("$SCRIPT_DIR"/patches/*.patch)
