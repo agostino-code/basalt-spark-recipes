@@ -237,3 +237,30 @@ riportata a quella posizione).
 **Stato:** il 620k non è ancora validato; il 16k/32k non è raggiungibile su questa macchina (RAM floor a
 ~164k con chunk 32k). Restano da fare: allineare `at`/`resume` (#2), poi rimisurare 33k/222k/620k e il
 quality gate.
+
+## Round 17 — lo stall è memoria, non una race: 117/121 GiB occupati a 360k
+
+Riprodotto due volte **esattamente** a `pp=360448/600022`, una con KV fp16 (643 s) e una con
+`--kv fp8` (644 s, 622 t/s): stesso punto, quindi non dipende dal tipo di KV. Al momento dello stall:
+
+- **RAM host: 117 GiB usati su 121, 3 GiB liberi** (`free -g`), 0 in swap;
+- host fermo in `cudaStreamSynchronize`, `info cuda kernels` = **No CUDA kernels**;
+- il RAM guard del motore non è ancora scattato (floor 1024 MiB), quindi non è un `halted()`.
+
+Il quadro corretto è quindi: il prefill da 600k token **esaurisce la memoria host** attorno ai 360k
+token; con la memoria al limite il percorso host (page cache, compaction, copie zero-copy) si blocca e
+la `cudaStreamSynchronize` non torna più. Non è un deadlock di kernel né una race di staging: le sonde,
+il doppio buffer, il ring e il tipo di KV sono tutti esclusi da misure.
+
+**Ricadute pratiche:**
+
+- `--kv fp8` non basta a far entrare 600k posizioni: serve ridurre il footprint (posizioni backed,
+  dimensione del contesto pianificato, o la lunghezza del prompt).
+- Con RAM critica il motore marcava la richiesta come `halted` a metà lettura e poi proseguiva al decode
+  alla posizione finale, producendo l'errore fuorviante "position P does not follow the state's N".
+  Corretto: un read interrotto ora termina la richiesta come `cancelled` (niente decode su un prompt che
+  non c'è), e `checkpoint_mount` ripristina la storia dei token (`set_history`).
+- 33k resta sano (HTTP 200, 43,7 s) sia prima sia dopo queste modifiche.
+
+**Da fare:** con il footprint ridotto, rimisurare 33k/222k/620k e fare il quality gate; oppure accettare
+che su questa macchina il tetto pratico è ~360k token per richiesta.
