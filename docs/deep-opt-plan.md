@@ -200,3 +200,40 @@ motivi distinti dal cap:
 **Stato del deliverable:** la configurazione validata (8192 righe) resta l'unica che porta i 620k in
 fondo; il percorso 16k/32k è una regressione nota e revertita. Il PR Qwen #1 (kv int8, 480.052 token,
 270,7 s) resta il risultato validato.
+
+## Round 16 — correzione: lo stall NON era il cap; due bug del resume trovati e uno corretto
+
+**Correzione al round 14.** Ripristinato *tutto* il baseline (cap, `put_i32` a singolo buffer, gate ring
+rimosso, `kMaxChunk/kLaunchRows` = 32768), il 620k **si blocca ancora**: `pp=360448/600022` dopo 643 s a
+618 t/s. Quindi il cap a 16k cambiava *dove* si blocca (prima), non *se*: lo stall è intermittente anche
+sul percorso validato. Il numero "620k = 1222,7 s" non è riproducibile su questo albero e va considerato
+un run fortunato, non una baseline stabile.
+
+**Copia pageable trovata e rimossa.** `place_rope()` caricava la tabella rotary da
+`std::vector<int32_t> tab` — memoria **pageable** — con `cudaMemcpyAsync` sulla stream del chunk, subito
+seguita da `cudaStreamSynchronize`: è esattamente "host fermo in una stream sync, nessun kernel in
+esecuzione" e gira a ogni confine di chunk, prima del layer 0. Ora la tabella va in un buffer **mappato**
+(`cudaHostAlloc(..., cudaHostAllocMapped)`, 3 × kMaxChunk interi) e la copia è il kernel
+`copy_i32x3_from_mapped` già usato da `put_i32`: nessun copy engine, nessuno staging del driver.
+Da validare sul 620k (i run successivi si sono fermati prima, per il bug qui sotto).
+
+**Bug del resume #1 (corretto).** `checkpoint_mount()` ripristinava lo stato di running ma **non la
+storia dei token**: `hist_` restava vuoto, così il primo checkpoint salvato dopo un mount falliva con
+"a checkpoint past the session's position" e un decode successivo sarebbe stato rifiutato con "position
+P does not follow the state's 0". Ora chiama `set_history(c.ids)`, come già faceva il percorso delle
+conversazioni parcheggiate (`restore_image`).
+
+**Bug del resume #2 (localizzato, non corretto).** Dopo un mount a fine prompt il lettore parte con
+`at` = posizione del checkpoint mentre la sessione ha un'altra storia: misurato
+`hy4flash: position 600021 does not follow the state's 65536` (HTTP 500 in 97 s, dopo 2 chunk letti a
+682 t/s). È la stessa classe del #1 ma sul bookkeeping `at`/`resume` invece che su `hist_`: da
+allineare (la posizione di ripresa deve essere quella che la sessione ha davvero, o la sessione va
+riportata a quella posizione).
+
+**Guardia aggiunta.** Un read interrotto (cancel) non salva più un checkpoint oltre le righe lette:
+`rows_read` registra l'ultima riga riportata dal progress e `read_to` esce con `Flow::quit` se
+`rows_read < to`. Il 33k resta HTTP 200 in 43,7 s (nessuna regressione sul percorso normale).
+
+**Stato:** il 620k non è ancora validato; il 16k/32k non è raggiungibile su questa macchina (RAM floor a
+~164k con chunk 32k). Restano da fare: allineare `at`/`resume` (#2), poi rimisurare 33k/222k/620k e il
+quality gate.
