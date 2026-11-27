@@ -140,3 +140,43 @@ Profilo 222k FP4: dense Q8_0 22%, `attend_mma` 16%, FP4 10%, quantize 7%, router
   (`idx_scores l41 pos 487424`, nessun `idx_sel`). La scrittura OOB di `cells` **non** è la causa.
 - Prossimo: `cuda-gdb` attach sul processo bloccato (`info cuda kernels`) o
   `compute-sanitizer --tool synccheck` per il deadlock del `select_kernel`.
+
+## Round 14 — il cap a 16k è la regressione: lo stall è il piano di memoria
+
+Il run 620k con `nsys` **completa** (600.022 token, ~348 s contro 1.222,7 s a 8k): il premio è reale,
+ma il percorso 16k si blocca solo fuori dal profiler — quindi è **dipendente dal timing**, non un
+evento mai registrato.
+
+**Cosa è stato escluso, misurato:**
+
+- **Doppio buffer nello staging del `put_i32`** (eventi per metà buffer): lo stall resta
+  (`pp=442368/600022`, 676 s) e senza sonde (`pp=442368`). Non è la race host/GPU dello staging.
+- **Ring degli esperti disattivato** (gate temporaneo `BASALT_NO_RING=1`, rimosso): lo stall resta e
+  cade di nuovo su **chunk 26 (`pp=425984`)**, dopo aver superato i chunk 16–25. Il ring **non** è la
+  causa: `ring_ready` fa join del thread prima di attendere `ring_copied_`, quindi la catena di eventi
+  è ordinata.
+- `cuda-gdb` attach (ptrace_scope=0): host fermo in `cudaStreamSynchronize`, `info cuda kernels` =
+  **No CUDA kernels** → GPU inattiva, quindi sulla `stream_` c'è un'operazione non-kernel pendente.
+- `compute-sanitizer --tool synccheck`: 0 errori (non è un deadlock di `__syncthreads`).
+
+**Causa individuata (diff contro il baseline):** il cap sperimentale
+
+```cpp
+const int cap = m_.context() > 262144 ? 16384 : (total > 131072 ? 16384 : kMaxChunk);
+```
+
+abbassa `want` a **16384 prima della sonda `partial_lend`**. La sonda chiede meno slot, il lend
+parziale **riesce**, e i chunk da 16k girano con la cache esperti elastica già piena. Gli stall
+cadono tutti dove quella cache si esaurisce: **393.216 = 24 × 16.384** (poi 26/29/30/31, sempre
+multipli di 16.384, sempre a inizio layer / `moe_start` del primo layer del chunk). Con il baseline
+`want = 32768`, la sonda chiede di più, il lend fallisce, si passa a `lend_all()` e il chunk scende a
+8k: è la configurazione con cui i 620k sono stati validati.
+
+**Ripristino (working tree `basalt-port/`):** rimossi cap, doppio buffer di staging ed eventi, gate
+`BASALT_NO_RING`; `kMaxChunk`/`kLaunchRows` = 32768. Resta solo il percorso FP4 prompt dietro
+`BASALT_FP4_PROMPT` (patch 0003).
+
+**Numero strano da segnalare:** il 33k su questo build fa **43,8 s (690 t/s, chunk 16.384)**; il
+24,8 s registrato prima non è riproducibile qui, quindi quel dato veniva da un albero/binario diverso
+(probabilmente pre-patch 0004 o con chunk 32k disponibili). Da rimisurare sull'albero ripristinato
+insieme a 222k/620k prima di aggiornare la tabella delle prestazioni.
