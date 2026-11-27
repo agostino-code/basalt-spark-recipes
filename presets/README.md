@@ -25,6 +25,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` | image input; mutually exclusive with the four-slot shape |
 | `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts | experimental one-term W4A4; needs patch 0003; quality trade, see below |
 | `hy4-fp4-1m` | Hy4 | 1 slot × 1,048,576, FP4 prompt experts | experimental one-term W4A4; needs patch 0003; the full 1M window |
+| `hy4-fp4-524` | Hy4 | 1 slot × 524,288, fp8 KV, FP4 prompt experts | experimental W4A4 + halved latents; the memory-lean long window with the faster prompt |
 | `qwen-agent` | Qwen | 4 slots × 262,144, int8 KV | the measured baseline; port 30001 |
 | `qwen-2` | Qwen | 2 slots × 262,144, int8 KV | the largest configuration that measured cleanly |
 | `qwen-single` | Qwen | 1 slot × 262,144, int8 KV | one full window at a time |
@@ -64,6 +65,7 @@ patch the variable is ignored and the normal MMQ experts run.
 ```bash
 ./run.sh --preset hy4-fp4        # 4 slots x 262,144
 ./run.sh --preset hy4-fp4-1m     # 1 slot x 1,048,576
+./run.sh --preset hy4-fp4-524    # 1 slot x 524,288, fp8 KV
 ```
 
 Measured with the prototype: 33k 24.8 s vs MMQ 31.4 s, 222k 237.5 s vs 270 s, 620k one slot
