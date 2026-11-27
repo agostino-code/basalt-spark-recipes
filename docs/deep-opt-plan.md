@@ -264,3 +264,29 @@ il doppio buffer, il ring e il tipo di KV sono tutti esclusi da misure.
 
 **Da fare:** con il footprint ridotto, rimisurare 33k/222k/620k e fare il quality gate; oppure accettare
 che su questa macchina il tetto pratico è ~360k token per richiesta.
+
+## Round 18 — il tetto è il tier esperti: reserve e KV si contendono la stessa memoria
+
+Il motore stesso, con `--vram-reserve-mib 60000`, dice:
+`the latent caches cannot grow to 606208 positions: the VRAM reserve of 60000 MiB stays free; a smaller
+--max-context leaves more for the expert tier` (HTTP 500 in **1,1 s**, rifiuto pulito). Quindi il
+fallimento a metà prompt è la **crescita del KV che non trova memoria**, non un deadlock CUDA: quando
+riesce a valutarlo all'inizio il motore rifiuta in un secondo, quando la crescita avviene a metà prompt
+resta appeso (host in stream sync, GPU idle) invece di riportare lo stesso rifiuto.
+
+**Il conflitto di configurazione (misurato):**
+
+| reserve | esperti in VRAM | KV | esito |
+|---|---|---|---|
+| 700 MiB (default) | 512/512, 77,84 GiB | cresce fino a ~360k | prefill a 360448, poi appeso (117/121 GiB usati) |
+| 60000 MiB | 37,2 GB spostati in RAM | non può crescere fino a 606208 | rifiuto pulito in 1,1 s |
+
+`--vram-reserve-mib` fa due cose insieme: libera VRAM dagli esperti **e** la sottrae al KV. Su una
+macchina a pool unificato da 121 GiB servirebbe "sposta gli esperti in RAM e lascia quella memoria al
+KV", che oggi non è esprimibile: o il KV non cresce, o gli esperti restano wired e il KV non entra.
+Il tetto pratico misurato resta **~360k token per richiesta**.
+
+**Prossimo passo (concreto):** separare i due effetti nel tier (dare al KV la memoria liberata dagli
+esperti senza contarla come reserve) e, in ogni caso, far sì che una crescita KV fallita a metà prompt
+ritorni `Refused` come all'inizio, invece di restare appesa: è la differenza fra un errore in 1 s e uno
+stall di 643 s.
