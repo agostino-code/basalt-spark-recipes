@@ -290,3 +290,21 @@ Il tetto pratico misurato resta **~360k token per richiesta**.
 esperti senza contarla come reserve) e, in ogni caso, far sì che una crescita KV fallita a metà prompt
 ritorni `Refused` come all'inizio, invece di restare appesa: è la differenza fra un errore in 1 s e uno
 stall di 643 s.
+
+## Round 19 — il pre-check della crescita non basta: il tetto è nel reclaim del tier
+
+Provato a trasformare lo stall in un rifiuto pulito con un pre-check di `kv_ceiling()` prima di
+`ensure_positions()` in `run_rows_impl`. **Non scatta**: il 620k resta appeso a `pp=360448` per 644 s
+(503 dal server), perché `kv_ceiling()` conta come disponibili gli slot del tier esperti
+(`tier_->slots() * stride_`), mentre è proprio il loro reclaim che si blocca. Il pre-check è stato
+rimosso: non fa quello che dichiara.
+
+Conclusione del filone: il blocco non è nel percorso CUDA del modello (sonde, staging, ring, tipo di KV
+e sync esclusi da misure) ma nella **crescita del KV sotto pressione di memoria**, dove il reclaim del
+tier esperti non torna. Il tetto misurato su questa macchina resta ~360k token per richiesta.
+
+Le due strade rimaste, fuori dal budget di questo ciclo:
+1. dare al KV la memoria liberata dagli esperti senza conteggiarla come reserve (separare i due effetti
+   di `--vram-reserve-mib`), così 512 slot → 269 slot liberano ~37 GiB per il KV;
+2. rendere bounded il reclaim del tier (`ExpertTier::reclaim` / `cache_.grow`) con un timeout o un
+   conteggio dei tentativi, e mappare il fallimento su `Refused`.
