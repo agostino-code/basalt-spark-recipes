@@ -328,7 +328,9 @@ log") con il pool a ~117/121 GiB: è la fine della memoria, non un errore CUDA r
 - `patches/0004-qsa-seg-parity-int8.patch` — test di parità (rigenerata);
 - **nuova** `patches/0005-hy4-serve-prompt-fixes.patch` — `checkpoint_mount` che ripristina la storia dei
   token, read interrotto che chiude la richiesta come `cancelled`, upload della tabella rotary da memoria
-  mappata. Tutte e quattro verificate con `git apply --reverse --check` sul working tree.
+  mappata. Tutte e quattro verificate: applicate in ordine a un worktree pulito al commit pinnato
+  riproducono il working tree (diff vuoto su `src/`, `include/`, `tests/`), e `git apply --reverse --check`
+  conferma che corrispondono allo stato attuale.
 - `presets/hy4-fp4-1m.conf` — corretto il dato irreperibile "620k = 1222,7 s", aggiunti i numeri misurati
   (33k: 45,7 s) e il tetto di memoria; `--kv fp8` documentato come opzione per prompt più lunghi.
 - `install-basalt.sh` — commento dei passi aggiornato con la 0005.
