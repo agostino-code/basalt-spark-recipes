@@ -20,6 +20,7 @@ value. That is how `hy4-2` and `qwen-2` get two slots without a second start scr
 | `hy4-fp8` | Hy4 | 4 slots × 262,144, fp8 KV | half the KV (~15 → ~8.7 GiB), the difference in expert slots |
 | `hy4-2` | Hy4 | 2 slots × 262,144, fp16 KV | lower memory, shorter queue |
 | `hy4-2x524` | Hy4 | 2 slots × 524,288, fp16 KV | two long windows; chunk policy in main |
+| `hy4-524` | Hy4 | 1 slot × 524,288, fp8 KV | one long window, memory-lean: fp8 halves the latent caches (~45 → ~22 GiB) |
 | `hy4-1m` | Hy4 | 1 slot × 1,048,576, fp16 KV | the model's full 1M window; chunk policy in main |
 | `hy4-vision` | Hy4 | 1 slot × 262,144, `--vision dynamic` | image input; mutually exclusive with the four-slot shape |
 | `hy4-fp4` | Hy4 | 4 slots × 262,144, FP4 prompt experts | experimental one-term W4A4; needs patch 0003; quality trade, see below |
@@ -49,6 +50,7 @@ cost:
 | `qwen` batch numerics | the slots are not bitwise against a one-slot window: the same greedy prompt moves a row's logits by ~0.1 nats and a near-tie token can flip. The unchanged int8 batch does the same, so it is the 0.5.0 batch path, not the FP16 store; one slot for exact reproduction. |
 | `qwen` int8 regression | the unchanged int8 batch path with two slots still answers. |
 | `hy4-2x524` / `hy4-1m` (in main) | an 80k-token prompt passes on both (2 × 524,288: 200, 140 s; 1 × 1,048,576: 200, 139 s); 2 × 524,288 also passes 200k tokens (200, 267 s). A full 524k/1M prompt is not measured. |
+| `hy4-524` / `hy4-fp4-1m` on a 121 GiB GB10 | a 33k prompt passes (200, 46.0 s, 656 tok/s). Above ~300k tokens the prompt path runs out of memory before the context is reached (the pool sits at ~117/121 GiB, the engine ends), so 524k and 1M are unmeasured here: `--kv fp8` alone does not fit them beside 77.84 GiB of resident experts. |
 | Hy4 prefill (in main) | 33k tokens in 32.4 s against 36.1 s with 16k chunks (~10%), 80k in 78.8 s; the 16k depth is unchanged and prompts above 128k keep 16,384-row chunks. |
 | `qwen` fp16 + `--kv-resident` | refused at the batch init: `a batch window's FP16 K/V must be resident (drop --kv-resident)`. |
 | `--reasoning-budget-tokens 64` with `max_tokens 96` | the answer is kept (110 chars) instead of spending the cap on thinking. |
