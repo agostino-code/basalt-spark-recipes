@@ -1,0 +1,384 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 2dadea3e..5946e624 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -114,7 +114,7 @@ jobs:
+       - name: Server tests
+         run: python -m pytest serve/tests -n auto -q
+       - name: Tool tests
+-        run: python -m pytest tools/test_bench_flags.py tools/test_bench_fixtures.py tools/test_serve_launcher.py tools/test_tokenizer.py tools/test_community_gate.py tools/test_community_sync.py tools/test_llm_review.py -q
++        run: python -m pytest tools/test_bench_flags.py tools/test_bench_fixtures.py tools/test_serve_launcher.py tools/test_tokenizer.py tools/test_community_gate.py tools/test_community_sync.py tools/test_llm_review.py tools/test_niah_gate.py -q
+       - name: Converter tests
+         run: python -m unittest discover -s tools/convert -p "test_*.py"
+       - name: Migration tests
+diff --git a/tools/niah_gate.py b/tools/niah_gate.py
+new file mode 100644
+index 00000000..2e38155c
+--- /dev/null
++++ b/tools/niah_gate.py
+@@ -0,0 +1,189 @@
++#!/usr/bin/env python3
++"""Long-context recall on the served API: needles planted in filler of a chosen depth, then found or not.
++
++    niah_gate.py BASE_URL [--model M] [--depths 8192,65536] [--needles 8] [--seed 1234]
++                         [--min-recall 1.0] [--request-timeout 900] [--out FILE.json]
++
++Each depth builds one conversation-length prompt from filler sentences with `needles` planted lines
++spaced evenly through it, then asks one question per needle. A needle reads like the sentence
++
++    the crimson fox carries a brass lantern number 731 near the pier
++
++and its question names the object, its color and its landmark but never its number; the answer is
++right when that number stands alone in the reply. Recall under --min-recall at any depth exits 1; a
++transport error exits 2; 0 prints the PASS line. `--out` keeps every row (depth, target and actual
++tokens, hits, seconds) for the record. The words-to-tokens rate comes from the server's own usage
++count of a calibration probe when it reports one, and from a constant estimate when it does not.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import random
++import re
++import sys
++import time
++import urllib.request
++
++ADJ = ["crimson", "cobalt", "amber", "jade", "violet", "silver", "ochre", "ivory", "scarlet", "indigo"]
++ANIMAL = ["fox", "heron", "badger", "otter", "falcon", "marten", "lynx", "crane", "shrew", "mole"]
++VERB = ["carries", "guards", "trades for", "borrows", "returns", "polishes", "hides", "counts"]
++ITEM = ["lantern", "compass", "ledger", "amphora", "spyglass", "crate", "medal", "ferry ticket"]
++PLACE = ["pier", "lighthouse", "orchard", "viaduct", "quarry", "depot", "millrace", "greenhouse"]
++FILLER = [
++    "The committee reviewed the quarterly figures and noted that the regional offices met their targets.",
++    "Rain arrived late that season and the harvest moved indoors under canvas and lamplight.",
++    "The ferry kept its timetable through the fog, and the deckhands said nothing about the delay.",
++    "She annotated the proof in the margin and left the corollary to the next reading.",
++    "The archive catalogued the shipment twice, once by weight and once by the crate's stamped seal.",
++    "Volumes three through seven arrived damaged and were rebound at the city press.",
++    "The surveyor walked the boundary again after the river moved its bed downstream.",
++    "He set the type by hand, line by line, and proofed the sheet before the first run.",
++]
++TPW = 1.35  # tokens per word for the estimate, the rate the English above measures near
++KEY_RE = r"(?<![\d.]){nn}(?![\d])"
++
++
++def plant(rng: random.Random, n: int) -> list[dict]:
++    """n needles with unique numbers and distinguishable (color, item, place) triples."""
++    used, out = set(), []
++    for _ in range(n):
++        while True:
++            row = dict(zip(("adj", "animal", "verb", "color", "item", "place"),
++                           (rng.choice(ADJ), rng.choice(ANIMAL), rng.choice(VERB),
++                            rng.choice(ADJ), rng.choice(ITEM), rng.choice(PLACE))))
++            nn = rng.randrange(100, 1000)
++            trip = (row["color"], row["item"], row["place"])
++            if trip not in used and all(nn != r["nn"] for r in out):
++                used.add(trip)
++                row["nn"] = nn
++                out.append(row)
++                break
++    return out
++
++
++def sentence(ndl: dict) -> str:
++    return f"The {ndl['adj']} {ndl['animal']} {ndl['verb']} the {ndl['color']} {ndl['item']} number {ndl['nn']} near the {ndl['place']}."
++
++
++def question(ndl: dict) -> str:
++    return (f"The text above mentioned the {ndl['color']} {ndl['item']} near the {ndl['place']}. "
++            f"What number was written on it? Answer with the number alone.")
++
++
++def prompt_words(target_tokens: int, tpw: float, needles: list[dict]) -> list[str]:
++    """The filler sentences around the needles, spaced evenly, sized to target_tokens."""
++    n = len(needles)
++    words = max(n, int(target_tokens / tpw))   # the text's words (the target is in tokens, tpw words -> tokens)
++    lines, have, i = [], 0, 0
++    while have < words:                        # FILLER entries are whole sentences: count the words they carry
++        f = FILLER[i % len(FILLER)]
++        lines.append(f)
++        have += f.count(" ") + 1
++        i += 1
++    slots = [int((k + 1) * len(lines) / (n + 1)) for k in range(n)]
++    for slot, ndl in zip(slots, needles):
++        lines.insert(slot, sentence(ndl))
++    return lines
++
++
++def ask(transport, model: str, text: str, max_tokens: int) -> tuple[str, int | None]:
++    payload = {"temperature": 0, "max_tokens": max_tokens}
++    if model:
++        payload["model"] = model
++    payload["messages"] = [{"role": "user", "content": text}]
++    reply, usage = transport(payload)
++    tokens = None
++    if isinstance(usage, dict):
++        pt = usage.get("prompt_tokens")
++        tokens = pt if isinstance(pt, int) else None
++    return reply, tokens
++
++
++def calibrate(transport, model: str) -> float:
++    """The words-to-tokens factor from one probe, or the constant estimate when usage is absent."""
++    probe = " ".join([FILLER[0]] * 8)
++    probe_words = probe.count(" ") + 1
++    _, tok = ask(transport, model, probe, 8)
++    if tok and tok > 0:
++        return tok / probe_words
++    print("niah: the server gave no usage; estimating tokens with 1.35 per word", file=sys.stderr)
++    return TPW
++
++
++def run_depth(transport, model: str, rng: random.Random, target: int, n: int, tpw: float,
++              needles: list[dict] | None = None) -> dict:
++    needles = needles if needles is not None else plant(rng, n)
++    lines = prompt_words(target, tpw, needles)
++    text = " ".join(lines)
++    hits, misses = 0, []
++    t0 = time.monotonic()
++    for ndl in needles:
++        reply, _ = ask(transport, model, text + "\n\n" + question(ndl), 256)
++        if re.search(KEY_RE.format(nn=ndl["nn"]), reply):
++            hits += 1
++        else:
++            misses.append({"nn": ndl["nn"], "reply": reply.strip()[:120]})
++    secs = time.monotonic() - t0
++    return {"depth": target, "needles": n, "hits": hits, "recall": hits / n if n else 1.0,
++            "seconds": round(secs, 1), "misses": misses}
++
++
++def post_factory(base: str, timeout: int):
++    url = base.rstrip("/") + "/v1/chat/completions"
++
++    def transport(payload: dict) -> tuple[str, dict | None]:
++        req = urllib.request.Request(url, data=json.dumps(payload).encode(),
++                                     headers={"Content-Type": "application/json"}, method="POST")
++        with urllib.request.urlopen(req, timeout=timeout) as r:
++            body = json.loads(r.read().decode())
++        try:
++            msg = body["choices"][0]["message"]
++            # a reasoning model puts the text in reasoning_content while thinking (content is null until it answers)
++            return (msg.get("content") or msg.get("reasoning_content") or ""), body.get("usage")
++        except (KeyError, IndexError, TypeError) as exc:
++            raise RuntimeError(f"unexpected reply shape: {exc}") from exc
++
++    return transport
++
++
++def main(argv: list[str] | None = None, transport=None) -> int:
++    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
++    ap.add_argument("base", help="http://host:port of a running server")
++    ap.add_argument("--model", default="")
++    ap.add_argument("--depths", default="8192,65536", help="comma-separated token depths")
++    ap.add_argument("--needles", type=int, default=8)
++    ap.add_argument("--seed", type=int, default=1234)
++    ap.add_argument("--min-recall", type=float, default=1.0)
++    ap.add_argument("--request-timeout", type=int, default=900)
++    ap.add_argument("--out", default="", help="write the rows as JSON here")
++    args = ap.parse_args(argv)
++
++    tp = transport or post_factory(args.base, args.request_timeout)
++    try:
++        tpw = calibrate(tp, args.model)
++        rng = random.Random(args.seed)
++        rows = [run_depth(tp, args.model, rng, d, args.needles, tpw) for d in
++                (int(x) for x in args.depths.split(",") if x.strip())]
++    except RuntimeError as exc:
++        print(f"niah: transport error: {exc}", file=sys.stderr)
++        return 2
++
++    for row in rows:
++        flag = "ok " if row["recall"] >= args.min_recall else "LOW"
++        print(f"niah: [{flag}] depth {row['depth']:>7} needles {row['needles']:>2} "
++              f"hits {row['hits']:>2} recall {row['recall']:.3f} {row['seconds']:>6.1f}s")
++        for m in row["misses"]:
++            print(f"       miss number {m['nn']}: {m['reply']!r}")
++    worst = min((r["recall"] for r in rows), default=1.0)
++    print(f"niah: {'PASS' if worst >= args.min_recall else 'FAIL'} (worst recall {worst:.3f}, "
++          f"seed {args.seed}, min {args.min_recall})")
++    if args.out:
++        with open(args.out, "w") as f:
++            json.dump({"base": args.base, "model": args.model, "seed": args.seed,
++                       "min_recall": args.min_recall, "rows": rows}, f, indent=1)
++    return 0 if worst >= args.min_recall else 1
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tools/test_niah_gate.py b/tools/test_niah_gate.py
+new file mode 100644
+index 00000000..a04750c4
+--- /dev/null
++++ b/tools/test_niah_gate.py
+@@ -0,0 +1,170 @@
++"""Planting, spacing, scoring and the exit codes of tools/niah_gate.py.
++
++    python3 -m unittest tools.test_niah_gate       (no server, no GPU: CI-safe)
++"""
++import io
++import json
++import random
++import re
++import sys
++import tempfile
++import unittest
++from contextlib import redirect_stderr, redirect_stdout
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import niah_gate
++
++
++def qmap_transport(needles, right=True):
++    """A transport that answers each planted question with its number, or always 42."""
++
++    qmap = {niah_gate.question(nd): str(nd["nn"]) for nd in needles}
++
++    def tp(payload):
++        text = payload["messages"][0]["content"]
++        answer = qmap.get(text.rsplit("\n\n", 1)[-1], "42")
++        return (answer if right else "42"), {"prompt_tokens": int(len(text.split()) * 1.3)}
++
++    return tp
++
++
++class Plant(unittest.TestCase):
++    def test_unique_numbers_and_triples(self):
++        rows = niah_gate.plant(random.Random(7), 24)
++        self.assertEqual(len({r["nn"] for r in rows}), 24)
++        self.assertEqual(len({(r["color"], r["item"], r["place"]) for r in rows}), 24)
++
++    def test_deterministic_under_seed(self):
++        self.assertEqual(niah_gate.plant(random.Random(1), 8), niah_gate.plant(random.Random(1), 8))
++
++    def test_question_carries_no_digits(self):
++        for ndl in niah_gate.plant(random.Random(3), 8):
++            self.assertIsNone(re.search(r"\d", niah_gate.question(ndl)))
++            self.assertIsNotNone(re.search(niah_gate.KEY_RE.format(nn=ndl["nn"]), niah_gate.sentence(ndl)))
++
++
++class Scoring(unittest.TestCase):
++    def test_number_boundaries(self):
++        self.assertIsNotNone(re.search(niah_gate.KEY_RE.format(nn=731), "the number was 731 near the pier"))
++        self.assertIsNone(re.search(niah_gate.KEY_RE.format(nn=731), "1731"))
++        self.assertIsNone(re.search(niah_gate.KEY_RE.format(nn=731), "7310"))
++        self.assertIsNotNone(re.search(niah_gate.KEY_RE.format(nn=731), "731."))
++
++    def test_run_depth_counts_every_needle(self):
++        needles = niah_gate.plant(random.Random(21), 5)
++        got = niah_gate.run_depth(qmap_transport(needles), "", random.Random(21), 1024, 5, 1.35, needles)
++        self.assertEqual((got["needles"], got["hits"], got["recall"]), (5, 5, 1.0))
++
++    def test_run_depth_zero_recall(self):
++        needles = niah_gate.plant(random.Random(22), 5)
++        got = niah_gate.run_depth(qmap_transport(needles, right=False), "", random.Random(22), 1024, 5, 1.35, needles)
++        self.assertEqual((got["hits"], len(got["misses"])), (0, 5))
++
++    def test_spacing_and_size(self):
++        needles = niah_gate.plant(random.Random(5), 4)
++        lines = niah_gate.prompt_words(4000, 1.0, needles)
++        text = " ".join(lines)
++        pos = [text.index(f"number {ndl['nn']}") for ndl in needles]
++        self.assertEqual(pos, sorted(pos))
++        words = text.count(" ") + 1            # the target is in tokens, so the filler's words are what is sized
++        self.assertGreater(words, 3000)        # target 4000 tokens at 1.0 words/token: ~4000 words plus the needles
++        self.assertLess(words, 4400)
++
++
++class Calibrate(unittest.TestCase):
++    def test_usage_gives_the_factor(self):
++        probe_words = (" ".join([niah_gate.FILLER[0]] * 8)).count(" ") + 1
++        tp = lambda payload: ("ok", {"prompt_tokens": probe_words * 13 // 10})
++        self.assertAlmostEqual(niah_gate.calibrate(tp, ""), 1.3)
++
++    def test_no_usage_falls_back(self):
++        with redirect_stderr(io.StringIO()):
++            self.assertEqual(niah_gate.calibrate(lambda payload: ("ok", None), ""), niah_gate.TPW)
++
++
++class Main(unittest.TestCase):
++    def _main(self, transport, extra=()):
++        out, err = io.StringIO(), io.StringIO()
++        with redirect_stdout(out), redirect_stderr(err):
++            code = niah_gate.main(["http://127.0.0.1:1", "--depths", "512", "--needles", "3",
++                                   "--seed", "9", *extra], transport=transport)
++        return code, out.getvalue()
++
++    def _fixed_plant(self, needles):
++        """Pin plant() so main() and the scripted transport see the same needles."""
++        saved = niah_gate.plant
++        niah_gate.plant = lambda rng, n: list(needles)
++        return saved
++
++    def test_perfect_recall_exits_zero(self):
++        needles = niah_gate.plant(random.Random(9), 3)
++        saved = self._fixed_plant(needles)
++        try:
++            code, out = self._main(qmap_transport(needles))
++        finally:
++            niah_gate.plant = saved
++        self.assertEqual(code, 0)
++        self.assertIn("PASS", out)
++
++    def test_zero_recall_exits_one(self):
++        code, out = self._main(lambda payload: ("42", {"prompt_tokens": 100}))
++        self.assertEqual(code, 1)
++        self.assertIn("FAIL", out)
++
++    def test_transport_error_exits_two(self):
++        def boom(payload):
++            raise RuntimeError("connection refused")
++        code, _ = self._main(boom)
++        self.assertEqual(code, 2)
++
++    def test_out_writes_rows(self):
++        f = None
++        with tempfile.TemporaryDirectory() as d:
++            f = Path(d) / "niah.json"
++            self._main(lambda payload: ("42", {"prompt_tokens": 100}), extra=["--out", str(f)])
++            data = json.loads(f.read_text())
++            self.assertEqual(data["seed"], 9)
++            self.assertEqual(len(data["rows"]), 1)
++            self.assertTrue({"depth", "needles", "hits", "recall", "seconds"} <= set(data["rows"][0]))
++
++
++if __name__ == "__main__":
++    unittest.main()
++
++
++class PostFactoryTest(unittest.TestCase):
++    """A reasoning model answers in reasoning_content while content is null (Qwen 3.8, Hy4)."""
++
++    @staticmethod
++    def _reply(message, usage=None):
++        body = {"choices": [{"message": message}]}
++        if usage:
++            body["usage"] = usage
++
++        class R:
++            def __enter__(self):
++                return self
++
++            def __exit__(self, *a):
++                return False
++
++            def read(self):
++                return json.dumps(body).encode()
++
++        return R()
++
++    def test_null_content_falls_back_to_reasoning(self):
++        from unittest import mock
++        r = self._reply({"content": None, "reasoning_content": "number 12"}, {"prompt_tokens": 7})
++        with mock.patch.object(niah_gate.urllib.request, "urlopen", return_value=r):
++            text, usage = niah_gate.post_factory("http://127.0.0.1:1", 5)({"messages": []})
++        self.assertEqual(text, "number 12")
++        self.assertEqual(usage["prompt_tokens"], 7)
++
++    def test_both_null_is_empty_not_crash(self):
++        from unittest import mock
++        r = self._reply({"content": None, "reasoning_content": None})
++        with mock.patch.object(niah_gate.urllib.request, "urlopen", return_value=r):
++            text, _ = niah_gate.post_factory("http://127.0.0.1:1", 5)({"messages": []})
++        self.assertEqual(text, "")
