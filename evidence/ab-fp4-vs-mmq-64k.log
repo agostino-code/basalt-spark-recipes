@@ -1,0 +1,4 @@
+ab: the power limit could not be read; pass --power-label W to basalt-bench on both arms
+ab: test           A tok/s   B tok/s      B/A  verdict   accept A/B
+ab: pp65536         668.64    818.84  +22.46%  AHEAD        -
+ab: PASS (band 5.0%, 2 runs per arm, ABBA order)

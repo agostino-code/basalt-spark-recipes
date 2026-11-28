@@ -1,0 +1,7 @@
+ok   0001-qwen-fp16-batch.patch  (forward + reverse clean)
+ok   0003-hy4-fp4-prompt.patch  (forward + reverse clean)
+ok   0004-qsa-seg-parity-int8.patch  (forward + reverse clean)
+ok   0005-hy4-serve-prompt-fixes.patch  (forward + reverse clean)
+ok   0006-kernel-spill-ratchet.patch  (forward + reverse clean)
+ok   0007-niah-long-context-gate.patch  (forward + reverse clean)
+ok   0008-abba-a-b-runner.patch  (forward + reverse clean)

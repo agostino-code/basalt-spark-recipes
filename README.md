@@ -49,6 +49,23 @@ not tested*; both appendices are that validation for their pack.
   with FP16 K/V: the segment K/V append stores the resident FP16 pools, so `--parallel` 2–4 works
   with `--kv fp16` (streamed FP16 is refused). Rebases the 0.5.6 port onto main; PR #694.
 * the Hy4 prompt-chunk policy (32k/16k/8k) is **in main** via PR #695 — no patch.
+* [patches/0006-kernel-spill-ratchet.patch](patches/0006-kernel-spill-ratchet.patch) — the kernel
+  spill ratchet, Infernix discipline contributed upstream: `tools/check_cuda_spill.sh` fails the
+  build's Spark CI leg when `cuobjdump -res-usage` shows `STACK` or `LOCAL` above zero for a kernel
+  that `tools/spill.allow` does not list under its arch (seeded for sm_121 from the clean pin build
+  and the patched build, 683 lines; aged lines are counted, not failed). The negative control went
+  red exactly on the dropped line; both real binaries green: [evidence/](evidence/)
+  `spill-ratchet-pin.log`, `spill-ratchet-patched.log`.
+* [patches/0007-niah-long-context-gate.patch](patches/0007-niah-long-context-gate.patch) — the
+  long-context recall gate over the served API (`tools/niah_gate.py`): seeded needles spaced through
+  filler at chosen token depths, scored by the number the model must report, making the docs' ad
+  hoc needle runs reproducible and evidence-bearing; its offline tests join the CI Tool tests.
+* [patches/0008-abba-a-b-runner.patch](patches/0008-abba-a-b-runner.patch) — the ABBA A/B runner
+  (`tools/ab_bench.py`): operationalises the engine's own benchmarking rule that A/B comparisons
+  alternate the two arms in one session — medians, per-arm spread, B/A delta with a FLAT band and a
+  power-label warning, over `basalt-bench`'s own JSON line; its offline tests join the CI Tool tests.
+* the replay of the whole series (0001/0003/0004/0005 + these three) on a fresh worktree at the pin,
+  each patch forward-checked, applied and reverse-checked: [evidence/replay-series-0001-0008.log](evidence/replay-series-0001-0008.log).
 * [tools/](tools/) — the crash reproduction, the sanitizer wrapper, the two Hy4 launchers, the
   concurrency ladder and the Qwen acceptance check:
   * [tools/basalt-repro.py](tools/basalt-repro.py) — deterministic Hy4 crash reproduction (`crash`, `ladder`, `pair`).

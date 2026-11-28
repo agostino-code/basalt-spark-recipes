@@ -1,0 +1,306 @@
+{
+ "a": "bin/basalt-bench --model models/Hy4-flash-NVFP4.basalt -p 65536 -o json",
+ "b": "env BASALT_FP4_PROMPT=1 bin/basalt-bench --model models/Hy4-flash-NVFP4.basalt -p 65536 -o json",
+ "runs_per_arm": 2,
+ "within": 5.0,
+ "rows": [
+  {
+   "test": "pp65536",
+   "a": 668.64,
+   "a_span": [
+    665.707,
+    671.569
+   ],
+   "b": 818.84,
+   "b_span": [
+    818.056,
+    819.629
+   ],
+   "delta_pct": 22.46,
+   "verdict": "AHEAD",
+   "accept_a": null,
+   "accept_b": null
+  }
+ ],
+ "warnings": [
+  "ab: the power limit could not be read; pass --power-label W to basalt-bench on both arms"
+ ],
+ "raw": {
+  "a": [
+   {
+    "engine_version": "0.5.7",
+    "commit": "c771c0a781",
+    "build_type": "Release",
+    "cuda_toolkit": "13.0.88",
+    "power_limit": "unknown",
+    "repetitions": 1,
+    "driver": "580.178.04",
+    "cuda_driver": "13.0",
+    "gpus": [
+     {
+      "name": "NVIDIA GB10",
+      "power_limit_w": -1,
+      "power_max_w": -1,
+      "sm_mhz": 923,
+      "mem_mhz": -1
+     }
+    ],
+    "model": "/home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt",
+    "engine_info": {
+     "commit": "c771c0a781-dirty",
+     "context": "56544",
+     "cpu_l3": "0-9;10-19",
+     "elastic_kv_ceiling": "56544",
+     "engine": "0.5.7",
+     "eos_ids": "120025",
+     "expert_slots": "20992",
+     "expert_slots_primary": "20992",
+     "gpus": "000F:01:00.0",
+     "kv": "fp16",
+     "logit_bias": "120832",
+     "lookup": "0",
+     "mtp_max": "0",
+     "quant": "NVFP4",
+     "ram_experts_mib": "155",
+     "spec": "6",
+     "spill_bytes": "0",
+     "spill_experts": "0",
+     "spill_total": "20992",
+     "text_prompt": "1"
+    },
+    "peer_tier": "",
+    "engine_args": "--model /home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt --gpu 0 --max-context 56544 --draft-log /tmp/basalt-bench-3619706/draft.log",
+    "lossy": [],
+    "summary": [
+     {
+      "test": "pp65536",
+      "tok_s_mean": 671.569,
+      "tok_s_stddev": 0
+     }
+    ],
+    "results": [
+     {
+      "repetition": 1,
+      "test": "pp65536",
+      "depth_tokens": 65536,
+      "prompt_tokens": 56500,
+      "reused_tokens": 0,
+      "prompt_ms": 84131.4,
+      "wall_s": 84.2393,
+      "first_token_s": 84.2393,
+      "wall_tok_s": 670.709,
+      "engine_tok_s": 671.569,
+      "sm_mhz_after": 2437,
+      "mem_mhz_after": -1
+     }
+    ]
+   },
+   {
+    "engine_version": "0.5.7",
+    "commit": "c771c0a781",
+    "build_type": "Release",
+    "cuda_toolkit": "13.0.88",
+    "power_limit": "unknown",
+    "repetitions": 1,
+    "driver": "580.178.04",
+    "cuda_driver": "13.0",
+    "gpus": [
+     {
+      "name": "NVIDIA GB10",
+      "power_limit_w": -1,
+      "power_max_w": -1,
+      "sm_mhz": 2431,
+      "mem_mhz": -1
+     }
+    ],
+    "model": "/home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt",
+    "engine_info": {
+     "commit": "c771c0a781-dirty",
+     "context": "56544",
+     "cpu_l3": "0-9;10-19",
+     "elastic_kv_ceiling": "56544",
+     "engine": "0.5.7",
+     "eos_ids": "120025",
+     "expert_slots": "20992",
+     "expert_slots_primary": "20992",
+     "gpus": "000F:01:00.0",
+     "kv": "fp16",
+     "logit_bias": "120832",
+     "lookup": "0",
+     "mtp_max": "0",
+     "quant": "NVFP4",
+     "ram_experts_mib": "155",
+     "spec": "6",
+     "spill_bytes": "0",
+     "spill_experts": "0",
+     "spill_total": "20992",
+     "text_prompt": "1"
+    },
+    "peer_tier": "",
+    "engine_args": "--model /home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt --gpu 0 --max-context 56544 --draft-log /tmp/basalt-bench-3622484/draft.log",
+    "lossy": [],
+    "summary": [
+     {
+      "test": "pp65536",
+      "tok_s_mean": 665.707,
+      "tok_s_stddev": 0
+     }
+    ],
+    "results": [
+     {
+      "repetition": 1,
+      "test": "pp65536",
+      "depth_tokens": 65536,
+      "prompt_tokens": 56500,
+      "reused_tokens": 0,
+      "prompt_ms": 84872.2,
+      "wall_s": 84.9548,
+      "first_token_s": 84.9548,
+      "wall_tok_s": 665.06,
+      "engine_tok_s": 665.707,
+      "sm_mhz_after": 2489,
+      "mem_mhz_after": -1
+     }
+    ]
+   }
+  ],
+  "b": [
+   {
+    "engine_version": "0.5.7",
+    "commit": "c771c0a781",
+    "build_type": "Release",
+    "cuda_toolkit": "13.0.88",
+    "power_limit": "unknown",
+    "repetitions": 1,
+    "driver": "580.178.04",
+    "cuda_driver": "13.0",
+    "gpus": [
+     {
+      "name": "NVIDIA GB10",
+      "power_limit_w": -1,
+      "power_max_w": -1,
+      "sm_mhz": 2437,
+      "mem_mhz": -1
+     }
+    ],
+    "model": "/home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt",
+    "engine_info": {
+     "commit": "c771c0a781-dirty",
+     "context": "56544",
+     "cpu_l3": "0-9;10-19",
+     "elastic_kv_ceiling": "56544",
+     "engine": "0.5.7",
+     "eos_ids": "120025",
+     "expert_slots": "20992",
+     "expert_slots_primary": "20992",
+     "gpus": "000F:01:00.0",
+     "kv": "fp16",
+     "logit_bias": "120832",
+     "lookup": "0",
+     "mtp_max": "0",
+     "quant": "NVFP4",
+     "ram_experts_mib": "155",
+     "spec": "6",
+     "spill_bytes": "0",
+     "spill_experts": "0",
+     "spill_total": "20992",
+     "text_prompt": "1"
+    },
+    "peer_tier": "",
+    "engine_args": "--model /home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt --gpu 0 --max-context 56544 --draft-log /tmp/basalt-bench-3620783/draft.log",
+    "lossy": [],
+    "summary": [
+     {
+      "test": "pp65536",
+      "tok_s_mean": 818.056,
+      "tok_s_stddev": 0
+     }
+    ],
+    "results": [
+     {
+      "repetition": 1,
+      "test": "pp65536",
+      "depth_tokens": 65536,
+      "prompt_tokens": 56500,
+      "reused_tokens": 0,
+      "prompt_ms": 69066.2,
+      "wall_s": 69.1518,
+      "first_token_s": 69.1518,
+      "wall_tok_s": 817.043,
+      "engine_tok_s": 818.056,
+      "sm_mhz_after": 2496,
+      "mem_mhz_after": -1
+     }
+    ]
+   },
+   {
+    "engine_version": "0.5.7",
+    "commit": "c771c0a781",
+    "build_type": "Release",
+    "cuda_toolkit": "13.0.88",
+    "power_limit": "unknown",
+    "repetitions": 1,
+    "driver": "580.178.04",
+    "cuda_driver": "13.0",
+    "gpus": [
+     {
+      "name": "NVIDIA GB10",
+      "power_limit_w": -1,
+      "power_max_w": -1,
+      "sm_mhz": 2431,
+      "mem_mhz": -1
+     }
+    ],
+    "model": "/home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt",
+    "engine_info": {
+     "commit": "c771c0a781-dirty",
+     "context": "56544",
+     "cpu_l3": "0-9;10-19",
+     "elastic_kv_ceiling": "56544",
+     "engine": "0.5.7",
+     "eos_ids": "120025",
+     "expert_slots": "20992",
+     "expert_slots_primary": "20992",
+     "gpus": "000F:01:00.0",
+     "kv": "fp16",
+     "logit_bias": "120832",
+     "lookup": "0",
+     "mtp_max": "0",
+     "quant": "NVFP4",
+     "ram_experts_mib": "155",
+     "spec": "6",
+     "spill_bytes": "0",
+     "spill_experts": "0",
+     "spill_total": "20992",
+     "text_prompt": "1"
+    },
+    "peer_tier": "",
+    "engine_args": "--model /home/pgx/Documenti/basalt-spark-recipes/basalt-port/models/Hy4-flash-NVFP4.basalt --gpu 0 --max-context 56544 --draft-log /tmp/basalt-bench-3621639/draft.log",
+    "lossy": [],
+    "summary": [
+     {
+      "test": "pp65536",
+      "tok_s_mean": 819.629,
+      "tok_s_stddev": 0
+     }
+    ],
+    "results": [
+     {
+      "repetition": 1,
+      "test": "pp65536",
+      "depth_tokens": 65536,
+      "prompt_tokens": 56500,
+      "reused_tokens": 0,
+      "prompt_ms": 68933.6,
+      "wall_s": 69.0128,
+      "first_token_s": 69.0128,
+      "wall_tok_s": 818.689,
+      "engine_tok_s": 819.629,
+      "sm_mhz_after": 2463,
+      "mem_mhz_after": -1
+     }
+    ]
+   }
+  ]
+ }
+}

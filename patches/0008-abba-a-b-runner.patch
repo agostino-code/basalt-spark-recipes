@@ -1,0 +1,319 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 4415871b..902f2088 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -114,7 +114,7 @@ jobs:
+       - name: Server tests
+         run: python -m pytest serve/tests -n auto -q
+       - name: Tool tests
+-        run: python -m pytest tools/test_bench_flags.py tools/test_bench_fixtures.py tools/test_serve_launcher.py tools/test_tokenizer.py tools/test_community_gate.py tools/test_community_sync.py tools/test_llm_review.py tools/test_niah_gate.py -q
++        run: python -m pytest tools/test_bench_flags.py tools/test_bench_fixtures.py tools/test_serve_launcher.py tools/test_tokenizer.py tools/test_community_gate.py tools/test_community_sync.py tools/test_llm_review.py tools/test_niah_gate.py tools/test_ab_bench.py -q
+       - name: Converter tests
+         run: python -m unittest discover -s tools/convert -p "test_*.py"
+       - name: Migration tests
+diff --git a/tools/ab_bench.py b/tools/ab_bench.py
+new file mode 100644
+index 00000000..4d0cbfcc
+--- /dev/null
++++ b/tools/ab_bench.py
+@@ -0,0 +1,145 @@
++#!/usr/bin/env python3
++"""Interleaved A/B of two full `basalt-bench` runs in one session: the ABBA of the benchmarking rule.
++
++    ab_bench.py --a 'bin/basalt-bench --model M.basalt ...' --b 'bin/basalt-bench --model M.basalt ...'
++                [--runs 4] [--within 1.5] [--out FILE.json]
++
++Each arm is a command line that runs the real bench; every run is a fresh process and a cold start,
++as basalt-bench defines it. The arms alternate ABBA within each block of four, so one build's drift
++does not land only on the other. Each run's stdout must end with the bench's JSON line; its summary
++gives each test's mean tokens/s and, on the decode fixtures, the mean acceptance. Per test the tool
++prints both arms' medians and min-max, the B/A delta, and FLAT when every test stays within
++--within percent of A. A test regressing beyond the band exits 1 (the worst delta decides); a run
++that fails or prints no parsable JSON exits 2. A run whose power limit reads unknown, or two runs
++that disagree on it, gets a warning: the rule is that every number states its power limit. `--out`
++keeps every per-run figure beside the verdict.
++"""
++from __future__ import annotations
++
++import argparse
++import json
++import shlex
++import statistics
++import subprocess
++import sys
++
++BLOCK = ("a", "b", "b", "a")   # ABBA: drift hits both arms mid-block, neither arm only second
++
++
++def run(cmd: str) -> dict:
++    """One basalt-bench run: its JSON, the line after its last '{' that parses."""
++    proc = subprocess.run(shlex.split(cmd), capture_output=True, text=True)
++    if proc.returncode != 0:
++        raise RuntimeError(f"run failed (exit {proc.returncode}): {cmd}\n"
++                           f"tail: {(proc.stdout + proc.stderr).strip().splitlines()[-1:]}")
++    for line in reversed(proc.stdout.splitlines()):
++        line = line.strip()
++        if line.startswith("{"):
++            try:
++                return json.loads(line)
++            except json.JSONDecodeError:
++                continue
++    raise RuntimeError(f"no JSON line at the end of: {cmd}")
++
++
++def plan(runs: int) -> list[str]:
++    """The arm order: whole ABBA blocks, each arm running `runs` times."""
++    if runs <= 0 or runs % 2:
++        raise SystemExit(f"ab: --runs must be a positive even number of runs per arm, got {runs}")
++    return list(BLOCK) * (runs // 2)
++
++
++def summarize(runs_by_arm: dict[str, list[dict]], within: float) -> tuple[list[dict], list[str]]:
++    """Per test the arms' medians and delta, and the warning lines. A run's summary entries give tok_s_mean."""
++    rows, warns = [], []
++    tests = []
++    for doc in runs_by_arm["a"]:
++        for entry in doc.get("summary", []):
++            if entry.get("test") not in [t[0] for t in tests]:
++                tests.append((entry["test"], entry))
++    for name, _ in tests:
++        per = {}
++        for arm in ("a", "b"):
++            vals = [e["tok_s_mean"] for doc in runs_by_arm[arm] for e in doc.get("summary", [])
++                    if e.get("test") == name and isinstance(e.get("tok_s_mean"), (int, float))]
++            if not vals:
++                continue
++            per[arm] = vals
++        if "a" not in per or "b" not in per:
++            warns.append(f"ab: {name}: one arm printed no figure for it; not compared")
++            continue
++        med_a, med_b = statistics.median(per["a"]), statistics.median(per["b"])
++        if med_a <= 0:
++            warns.append(f"ab: {name}: A's median is {med_a}, the delta is meaningless")
++            continue
++        delta = 100.0 * (med_b - med_a) / med_a
++        spread = max((max(v) - min(v)) / statistics.median(v) * 100.0 for v in (per["a"], per["b"]))
++        flag = "FLAT" if abs(delta) <= within else ("BEHIND" if delta < 0 else "AHEAD")
++        if spread > within:
++            flag += f"~noise{spread:.1f}%"
++        rows.append({"test": name, "a": round(med_a, 2), "a_span": [min(per["a"]), max(per["a"])],
++                     "b": round(med_b, 2), "b_span": [min(per["b"]), max(per["b"])],
++                     "delta_pct": round(delta, 2), "verdict": flag,
++                     "accept_a": _mean_acc(runs_by_arm["a"], name),
++                     "accept_b": _mean_acc(runs_by_arm["b"], name)})
++    return rows, warns
++
++
++def _mean_acc(docs: list[dict], name: str) -> float | None:
++    vals = [e["accept_pct_mean"] for doc in docs for e in doc.get("summary", [])
++            if e.get("test") == name and isinstance(e.get("accept_pct_mean"), (int, float))]
++    return round(statistics.mean(vals), 2) if vals else None
++
++
++def power_warnings(runs_by_arm: dict[str, list[dict]]) -> list[str]:
++    labels = {(arm, doc.get("power_limit", "unknown")) for arm, docs in runs_by_arm.items() for doc in docs}
++    uniq = {label for _, label in labels}
++    if len(uniq) > 1:
++        return [f"ab: the runs disagree on the power limit: {sorted(uniq)}; the arms were not at one power"]
++    if uniq and next(iter(uniq)) in ("unknown", "", None):
++        return ["ab: the power limit could not be read; pass --power-label W to basalt-bench on both arms"]
++    return []
++
++
++def main(argv: list[str] | None = None, runner=run) -> int:
++    ap = argparse.ArgumentParser(description="Interleaved A/B of two basalt-bench commands.")
++    ap.add_argument("--a", required=True, help="arm A's basalt-bench command line")
++    ap.add_argument("--b", required=True, help="arm B's basalt-bench command line")
++    ap.add_argument("--runs", type=int, default=4, help="runs per arm (even, ABBA blocks)")
++    ap.add_argument("--within", type=float, default=1.5, help="percent that stays FLAT")
++    ap.add_argument("--out", default="", help="write the full record as JSON here")
++    args = ap.parse_args(argv)
++
++    cmds = {"a": args.a, "b": args.b}
++    order = plan(args.runs)
++    runs_by_arm: dict[str, list[dict]] = {"a": [], "b": []}
++    try:
++        for arm in order:
++            runs_by_arm[arm].append(runner(cmds[arm]))
++    except (RuntimeError, OSError) as exc:
++        print(f"ab: {exc}", file=sys.stderr)
++        return 2
++
++    rows, warns = summarize(runs_by_arm, args.within)
++    warns += power_warnings(runs_by_arm)
++    for line in warns:
++        print(line, file=sys.stderr)
++    if not rows:
++        print("ab: no test printed figures in both arms", file=sys.stderr)
++        return 2
++    print(f"ab: {'test':<12} {'A tok/s':>9} {'B tok/s':>9} {'B/A':>8}  verdict   accept A/B")
++    for r in rows:
++        acc = f"{r['accept_a']}/{r['accept_b']}" if r["accept_a"] is not None else "-"
++        print(f"ab: {r['test']:<12} {r['a']:>9} {r['b']:>9} {r['delta_pct']:>+7.2f}%  {r['verdict']:<12} {acc}")
++    worst = min(r["delta_pct"] for r in rows)
++    verdict = "PASS" if worst >= -args.within else f"FAIL (worst test {worst:+.2f}%)"
++    print(f"ab: {verdict} (band {args.within}%, {args.runs} runs per arm, ABBA order)")
++    if args.out:
++        with open(args.out, "w") as f:
++            json.dump({"a": args.a, "b": args.b, "runs_per_arm": args.runs, "within": args.within,
++                       "rows": rows, "warnings": warns, "raw": runs_by_arm}, f, indent=1)
++    return 0 if worst >= -args.within else 1
++
++
++if __name__ == "__main__":
++    sys.exit(main())
+diff --git a/tools/test_ab_bench.py b/tools/test_ab_bench.py
+new file mode 100644
+index 00000000..66ed92c2
+--- /dev/null
++++ b/tools/test_ab_bench.py
+@@ -0,0 +1,149 @@
++"""The ABBA plan, the summary rows, the power warnings and the exit codes of tools/ab_bench.py.
++
++    python3 -m unittest tools.test_ab_bench        (no engine, no GPU: CI-safe)
++"""
++import io
++import json
++import sys
++import unittest
++from contextlib import redirect_stderr, redirect_stdout
++from pathlib import Path
++
++sys.path.insert(0, str(Path(__file__).resolve().parent))
++import ab_bench
++
++
++def doc(tests, power="500W", accept=None):
++    summary = [{"test": t, "tok_s_mean": v} for t, v in tests]
++    if accept:
++        for e in summary:
++            if e["test"] in accept:
++                e["accept_pct_mean"] = accept[e["test"]]
++    return {"power_limit": power, "summary": summary}
++
++
++class Plan(unittest.TestCase):
++    def test_abba_blocks(self):
++        self.assertEqual(ab_bench.plan(2), ["a", "b", "b", "a"])
++        self.assertEqual(ab_bench.plan(4), ["a", "b", "b", "a", "a", "b", "b", "a"])
++
++    def test_odd_runs_rejected(self):
++        with self.assertRaises(SystemExit):
++            ab_bench.plan(3)
++
++
++class Summarize(unittest.TestCase):
++    def test_medians_delta_and_accept(self):
++        a = [doc([("tg conv", 50.0)]), doc([("tg conv", 60.0)])]
++        b = [doc([("tg conv", 55.0)], accept={"tg conv": 70.0}), doc([("tg conv", 56.0)], accept={"tg conv": 80.0})]
++        rows, warns = ab_bench.summarize({"a": a, "b": b}, within=5.0)
++        self.assertEqual(len(rows), 1)
++        r = rows[0]
++        self.assertEqual(r["test"], "tg conv")
++        self.assertAlmostEqual(r["a"], 55.0)      # median of 50/60
++        self.assertAlmostEqual(r["b"], 55.5)
++        self.assertAlmostEqual(r["delta_pct"], 0.91, delta=0.01)
++        self.assertTrue(r["verdict"].startswith("FLAT"))
++        self.assertEqual(r["accept_a"], None)
++        self.assertEqual(r["accept_b"], 75.0)
++
++    def test_band_and_flags(self):
++        a = [doc([("x", 100.0)]), doc([("x", 100.0)])]
++        b = [doc([("x", 110.0)]), doc([("x", 110.0)])]
++        rows, _ = ab_bench.summarize({"a": a, "b": b}, within=1.5)
++        self.assertTrue(rows[0]["verdict"].startswith("AHEAD"))
++        rows, _ = ab_bench.summarize({"a": a, "b": [doc([("x", 90.0)]), doc([("x", 90.0)])]}, within=1.5)
++        self.assertTrue(rows[0]["verdict"].startswith("BEHIND"))
++
++    def test_noise_flag(self):
++        a = [doc([("x", 100.0)]), doc([("x", 100.0)])]
++        b = [doc([("x", 95.0)]), doc([("x", 115.0)])]
++        rows, _ = ab_bench.summarize({"a": a, "b": b}, within=1.5)
++        self.assertIn("~noise", rows[0]["verdict"])
++
++    def test_missing_arm_row_warns(self):
++        a = [doc([("x", 1.0)]), doc([("x", 1.0)])]
++        b = [doc([("y", 1.0)]), doc([("y", 1.0)])]
++        rows, warns = ab_bench.summarize({"a": a, "b": b}, within=1.5)
++        self.assertEqual(rows, [])
++        self.assertTrue(any("no figure" in w for w in warns))
++
++
++class Power(unittest.TestCase):
++    def test_unknown_label_warns(self):
++        docs = {"a": [doc([("x", 1.0)], power="unknown")], "b": [doc([("x", 1.0)], power="unknown")]}
++        self.assertTrue(any("power" in w for w in ab_bench.power_warnings(docs)))
++
++    def test_disagreement_warns(self):
++        docs = {"a": [doc([("x", 1.0)], power="400W")], "b": [doc([("x", 1.0)], power="500W")]}
++        self.assertTrue(any("disagree" in w for w in ab_bench.power_warnings(docs)))
++
++    def test_matched_label_is_silent(self):
++        docs = {"a": [doc([("x", 1.0)], power="500W")], "b": [doc([("x", 1.0)], power="500W")]}
++        self.assertEqual(ab_bench.power_warnings(docs), [])
++
++
++class Main(unittest.TestCase):
++    def _main(self, runner, runs=2):
++        out, err = io.StringIO(), io.StringIO()
++        with redirect_stdout(out), redirect_stderr(err):
++            code = ab_bench.main(["--a", "A", "--b", "B", "--runs", str(runs), "--within", "1.5"], runner=runner)
++        return code, out.getvalue(), err.getvalue()
++
++    def test_flat_passes_and_alternates(self):
++        seen = []
++
++        def runner(cmd):
++            seen.append(cmd)
++            base = 100.0 if cmd == "A" else 100.5
++            return doc([("tg conv", base)])
++
++        code, out, _ = self._main(runner)
++        self.assertEqual(code, 0)
++        self.assertIn("PASS", out)
++        self.assertEqual(seen, ["A", "B", "B", "A"])
++
++    def test_regression_fails(self):
++        def runner(cmd):
++            return doc([("tg conv", 100.0 if cmd == "A" else 90.0)])
++
++        code, out, _ = self._main(runner)
++        self.assertEqual(code, 1)
++        self.assertIn("FAIL", out)
++
++    def test_broken_run_exits_two(self):
++        def runner(cmd):
++            raise RuntimeError("boom")
++
++        code, _, err = self._main(runner)
++        self.assertEqual(code, 2)
++        self.assertIn("boom", err)
++
++    def test_no_common_tests_exits_two(self):
++        def runner(cmd):
++            return doc([("only_a" if cmd == "A" else "only_b", 5.0)])
++
++        code, _, err = self._main(runner)
++        self.assertEqual(code, 2)
++
++
++class Run(unittest.TestCase):
++    def test_run_parses_trailing_json(self):
++        import shlex
++        script = "print('basalt-bench: noise'); print('" + json.dumps({"power_limit": "500W", "summary": []}) + "')"
++        got = ab_bench.run(shlex.join([sys.executable, "-c", script]))
++        self.assertEqual(got["power_limit"], "500W")
++
++    def test_run_raises_on_nonzero_exit(self):
++        import shlex
++        with self.assertRaises(RuntimeError):
++            ab_bench.run(shlex.join([sys.executable, "-c", "raise SystemExit(3)"]))
++
++    def test_run_raises_without_json(self):
++        import shlex
++        with self.assertRaises(RuntimeError):
++            ab_bench.run(shlex.join([sys.executable, "-c", "print('no json here')"]))
++
++
++if __name__ == "__main__":
++    unittest.main()
